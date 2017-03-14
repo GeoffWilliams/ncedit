@@ -358,9 +358,39 @@ module NCEdit
       updated
     end
 
-    def self.ensure_rules(group_name, data)
-      # nc_group(group_name)
-       false
+    def self.ensure_rule(group, rule)
+      updated = false
+      if ! group["rules"]
+        # no rules yet - just add our new one
+        group["rules"] = []
+      end
+
+      # see if rule already exists, if it doesn't, append it
+      found = false
+      group["rules"].each {|system_rule|
+        if  system_rule[0] == rule[0] and
+            system_rule[1] == rule[1] and
+            system_rule[2] == rule[2]
+            # rule found
+            found = true
+        end
+      }
+      if ! found
+        puts "Appending rule: #{rule}"
+        group["rules"] << rule
+        updated = true
+      end
+
+      updated
+    end
+
+    def self.ensure_rules(group_name, rules)
+      updated = false
+      rules.each { |rule|
+        updated |= ensure_rule(nc_group(group_name), rule)
+      }
+
+      updated
     end
   end
 end
