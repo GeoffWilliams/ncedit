@@ -1,0 +1,60 @@
+#!/usr/bin/env ruby
+require 'escort'
+require 'puppetclassify'
+require 'lib/ncedit/version'
+
+# display help if nothing specified
+ARGV.push('-h') if ARGV.empty?
+
+Escort::App.create do |app|
+  app.version VERSION
+  app.summary "ncedit"
+  app.description "Edit PE node classification groups"
+
+
+  # app.options do |opts|
+  #   opts.opt(:ssh_username,
+  #     'Username to use when logging in over SSH',
+  #     :long => '--ssh-username',
+  #     :type => :string,
+  #     :default => 'root'
+  #   )
+  # end
+
+
+  app.command :rule do |command|
+    command.summary "Install all known nodes"
+    command.description "Install Puppet Enterprise master and agents on all known nodes"
+    command.options do |opts|
+      opts.opt(:group_name,
+        'NC group name',
+        :long => '--group-name',
+        :type => :string,
+      )
+      opts.opt(:class_name,
+        'NC class name',
+        :long => '--group-name',
+        :type => :string,
+      )
+      opts.opt(:param_name,
+        'NC parameter name',
+        :long => '--param-name',
+        :type => :string,
+      )
+      opts.opt(:param_value,
+        'NC parameter value',
+        :long => '--param-value',
+        :type => :string,
+      )
+      opts.opt(:delete,
+        'delete this rule',
+        :long    => '--param-value',
+        :type    => :boolean,
+        :default => false,
+      )
+
+    command.action do |options, arguments|
+      NCEdit::Cmd::rule(options, arguments)
+    end
+  end
+end
