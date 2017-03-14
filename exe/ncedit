@@ -1,13 +1,13 @@
 #!/usr/bin/env ruby
 require 'escort'
-require 'puppetclassify'
-require 'lib/ncedit/version'
+require 'ncedit/version'
+require 'ncedit/cmd'
 
 # display help if nothing specified
 ARGV.push('-h') if ARGV.empty?
 
 Escort::App.create do |app|
-  app.version VERSION
+  app.version NCEdit::VERSION
   app.summary "ncedit"
   app.description "Edit PE node classification groups"
 
@@ -22,7 +22,7 @@ Escort::App.create do |app|
   # end
 
 
-  app.command :rule do |command|
+  app.command :classes do |command|
     command.summary "Install all known nodes"
     command.description "Install Puppet Enterprise master and agents on all known nodes"
     command.options do |opts|
@@ -33,7 +33,7 @@ Escort::App.create do |app|
       )
       opts.opt(:class_name,
         'NC class name',
-        :long => '--group-name',
+        :long => '--class-name',
         :type => :string,
       )
       opts.opt(:param_name,
@@ -46,15 +46,22 @@ Escort::App.create do |app|
         :long => '--param-value',
         :type => :string,
       )
-      opts.opt(:delete,
+      opts.opt(:delete_class,
         'delete this rule',
-        :long    => '--param-value',
+        :long    => '--delete-class',
         :type    => :boolean,
         :default => false,
       )
-
+      opts.opt(:delete_param,
+        'delete this rule',
+        :long    => '--delete-param',
+        :type    => :boolean,
+        :default => false,
+      )
+      opts.dependency :param_value, :on => :param_name
+    end
     command.action do |options, arguments|
-      NCEdit::Cmd::rule(options, arguments)
+      NCEdit::Cmd::classes(options, arguments)
     end
   end
 end

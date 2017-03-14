@@ -1,5 +1,5 @@
 require "ncedit/version"
 
-module Ncedit
+module NCEdit
   # Your code goes here...
 end
