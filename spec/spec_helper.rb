@@ -1,5 +1,9 @@
+$LOAD_PATH.unshift File.expand_path("../../lib", __FILE__)
+
 require "bundler/setup"
 require "ncedit"
+require "fake_puppetclassify"
+
 
 RSpec.configure do |config|
   # Enable flags like --only-failures and --next-failure

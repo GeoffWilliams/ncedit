@@ -1,0 +1,20 @@
+'PE Master':
+  'classes':
+    'puppet_enterprise::profile::master':
+      'r10k_remote': 'http://blah'
+      'r10k_private_key': '/etc/topsecret'
+
+  'delete_classes':
+     'puppet_enterprise::profile::masterbad'
+
+  'delete_params':
+     'puppet_enterprise::profile::redo:'
+      - 'badparam'
+
+'Puppet Masters':
+  'clases':
+    'role::puppet::master'
+  'append_rule':
+    - - "="
+      - "name"
+      - "vmpump02.puppet.com"

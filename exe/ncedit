@@ -58,10 +58,30 @@ Escort::App.create do |app|
         :type    => :boolean,
         :default => false,
       )
+      opts.opt(:csv,
+        'bulk rules from CSV',
+        :long    => '--csv',
+        :type    => :string,
+      )
       opts.dependency :param_value, :on => :param_name
     end
     command.action do |options, arguments|
       NCEdit::Cmd::classes(options, arguments)
+    end
+  end
+
+  app.command :csv do |command|
+    command.summary "Read classifier rules from CSV file"
+    command.description "Install Puppet Enterprise master and agents on all known nodes"
+    command.options do |opts|
+      opts.opt(:filename,
+        'NC group name',
+        :long => '--filename',
+        :type => :string,
+      )
+    end
+    command.action do |options, arguments|
+      NCEdit::Cmd::csv(options, arguments)
     end
   end
 end

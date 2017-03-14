@@ -1,11 +1,7 @@
 require "spec_helper"
 
-RSpec.describe Ncedit do
+RSpec.describe NCEdit do
   it "has a version number" do
-    expect(Ncedit::VERSION).not_to be nil
-  end
-
-  it "does something useful" do
-    expect(false).to eq(true)
+    expect(NCEdit::VERSION).not_to be nil
   end
 end
