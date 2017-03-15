@@ -182,7 +182,9 @@ module NCEdit
             end
 
             if data.has_key?("append_rules")
+              puts "XXXXXXXXXXXXXXX #{data}"
               if ensure_rules(group_name, data["append_rules"])
+
                 update_group(group_name, rule: data["append_rules"])
               end
             end
@@ -329,6 +331,7 @@ puts "ZZZZZZZZZZZ #{group["rule"]}"
         group["rule"] = [DEFAULT_RULE,[]]
         puts "DEFAULT RULE ADDED"
       end
+      puts "rulezzzzzzzzzzz #{rules}"
       updated |= ensure_rule_conjunction(group, rules[0])
       rules[1].each { |rule|
         updated |= ensure_rule(group, rule)
@@ -339,6 +342,7 @@ puts "ZZZZZZZZZZZ #{group["rule"]}"
 
     def self.ensure_rule_conjunction(group, op)
       updated = false
+      puts "op <<<<#{op}"
       if ["and", "or"].include?(op)
         if group["rule"][0] != op
           group["rule"][0] = op
