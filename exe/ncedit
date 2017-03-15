@@ -70,18 +70,23 @@ Escort::App.create do |app|
     end
   end
 
-  app.command :csv do |command|
-    command.summary "Read classifier rules from CSV file"
-    command.description "Install Puppet Enterprise master and agents on all known nodes"
+  app.command :batch do |command|
+    command.summary "Batch processing from YAML"
+    command.description "Process a YAML file to add/delete classes, parameters and rules"
     command.options do |opts|
       opts.opt(:filename,
-        'NC group name',
+        'YAML file',
         :long => '--filename',
         :type => :string,
       )
     end
     command.action do |options, arguments|
-      NCEdit::Cmd::csv(options, arguments)
+      filename = options[:global][:commands][:batch][:options][:filename]
+      if filename == nil
+        Escort::Logger.error.error "Filename is required for batch updates"
+      else
+        NCEdit::Cmd::batch(filename)
+      end
     end
   end
 end

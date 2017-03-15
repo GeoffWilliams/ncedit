@@ -34,6 +34,13 @@ RSpec.describe NCEdit::Cmd do
     expect(update).to be false
   end
 
+  it "delete_class does not raise error when class not present" do
+    group = { "classes" => {}}
+
+    update = NCEdit::Cmd.delete_param(group, "foo", "clive")
+    expect(update).to be false
+  end
+
   it "ensure_class creates new class" do
     group = { "classes" => {"foo" => {}}}
 
@@ -255,7 +262,7 @@ RSpec.describe NCEdit::Cmd do
       ["=", "name", "vmpump02.puppet.com"],
       ["=", "name", "vmpump03.puppet.com"],
     ])
-puts ">>>>>>>>>>" + group["rules"].to_s
+
     expect(group["rules"].size).to be == 2
     expect(group["rules"][0][0]).to eq "="
     expect(group["rules"][0][1]).to eq "name"
