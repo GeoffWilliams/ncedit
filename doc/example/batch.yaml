@@ -9,13 +9,13 @@
       "code_manager_auto_configure": true
       "r10k_remote": "https://github.com/GeoffWilliams/r10k-control"
       "r10k_private_key": "/etc/puppetlabs/puppetserver/ssh/id-control_repo.rsa"
-#
-#   "delete_classes":
-#     - "puppet_enterprise::profile::masterbad"
-#
-#   "delete_params":
-#     "puppet_enterprise::profile::redo:":
-#       - "badparam"
+
+  "delete_classes":
+    - "puppet_enterprise::profile::masterbad"
+
+  "delete_params":
+    "puppet_enterprise::profile::redo:":
+      - "badparam"
 
 "Puppet Masters":
   "classes":
