@@ -11,64 +11,49 @@ Escort::App.create do |app|
   app.summary "ncedit"
   app.description "Edit PE node classification groups"
 
-
-  # app.options do |opts|
-  #   opts.opt(:ssh_username,
-  #     'Username to use when logging in over SSH',
-  #     :long => '--ssh-username',
-  #     :type => :string,
-  #     :default => 'root'
-  #   )
+  # not currently working...
+  # app.command :classes do |command|
+  #   command.summary "Install all known nodes"
+  #   command.description "Install Puppet Enterprise master and agents on all known nodes"
+  #   command.options do |opts|
+  #     opts.opt(:group_name,
+  #       'NC group name',
+  #       :long => '--group-name',
+  #       :type => :string,
+  #     )
+  #     opts.opt(:class_name,
+  #       'NC class name',
+  #       :long => '--class-name',
+  #       :type => :string,
+  #     )
+  #     opts.opt(:param_name,
+  #       'NC parameter name',
+  #       :long => '--param-name',
+  #       :type => :string,
+  #     )
+  #     opts.opt(:param_value,
+  #       'NC parameter value',
+  #       :long => '--param-value',
+  #       :type => :string,
+  #     )
+  #     opts.opt(:delete_class,
+  #       'delete this rule',
+  #       :long    => '--delete-class',
+  #       :type    => :boolean,
+  #       :default => false,
+  #     )
+  #     opts.opt(:delete_param,
+  #       'delete this rule',
+  #       :long    => '--delete-param',
+  #       :type    => :boolean,
+  #       :default => false,
+  #     )
+  #     opts.dependency :param_value, :on => :param_name
+  #   end
+  #   command.action do |options, arguments|
+  #     NCEdit::Cmd::classes(options, arguments)
+  #   end
   # end
-
-
-  app.command :classes do |command|
-    command.summary "Install all known nodes"
-    command.description "Install Puppet Enterprise master and agents on all known nodes"
-    command.options do |opts|
-      opts.opt(:group_name,
-        'NC group name',
-        :long => '--group-name',
-        :type => :string,
-      )
-      opts.opt(:class_name,
-        'NC class name',
-        :long => '--class-name',
-        :type => :string,
-      )
-      opts.opt(:param_name,
-        'NC parameter name',
-        :long => '--param-name',
-        :type => :string,
-      )
-      opts.opt(:param_value,
-        'NC parameter value',
-        :long => '--param-value',
-        :type => :string,
-      )
-      opts.opt(:delete_class,
-        'delete this rule',
-        :long    => '--delete-class',
-        :type    => :boolean,
-        :default => false,
-      )
-      opts.opt(:delete_param,
-        'delete this rule',
-        :long    => '--delete-param',
-        :type    => :boolean,
-        :default => false,
-      )
-      opts.opt(:csv,
-        'bulk rules from CSV',
-        :long    => '--csv',
-        :type    => :string,
-      )
-      opts.dependency :param_value, :on => :param_name
-    end
-    command.action do |options, arguments|
-      NCEdit::Cmd::classes(options, arguments)
-    end
-  end
 
   app.command :batch do |command|
     command.summary "Batch processing from YAML"
