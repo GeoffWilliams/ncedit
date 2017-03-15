@@ -1,5 +1,6 @@
 require 'puppetclassify'
 require 'yaml'
+require 'json'
 require 'escort'
 
 module NCEdit
@@ -134,6 +135,35 @@ module NCEdit
       end
     end
 
+    def self.read_batch_data(yaml_file: nil, json_file:nil)
+      if yaml_file == nil and json_file == nil
+        raise "YAML or JSON file must be specified for batch updates"
+      elsif yaml_file and json_file
+        raise "Cannot process both YAML and JSON at the same time"
+      elsif yaml_file
+        if File.exists?(yaml_file)
+          begin
+            data = YAML.load_file(yaml_file)
+          rescue Psych::SyntaxError
+            raise "syntax error parsing #{yaml_file}"
+          end
+        else
+          raise "YAML file not found: #{yaml_file}"
+        end
+      elsif json_file
+        if File.exists?(json_file)
+          begin
+            data = JSON.parse(IO.read(json_file))
+          rescue JSON::ParserError
+            raise "syntax error parsing #{json_file}"
+          end
+        else
+          raise "JSON file not found: #{json_file}"
+        end
+      end
+      data
+    end
+
     # Batch entry from YAML file, example file format:
     # 'PE Master':
     #   'classes':
@@ -155,46 +185,36 @@ module NCEdit
     #     - - "="
     #       - "name"
     #       - "vmpump02.puppet.com"
-    def self.batch(filename)
-      if File.exists?(filename)
-        begin
-          yaml = YAML.load_file(filename)
+    def self.batch(yaml_file: nil, json_file: nil)
+      data = read_batch_data(yaml_file: yaml_file, json_file: json_file)
+      data.each { |group_name, data|
 
-          yaml.each { |group_name, data|
-            Escort::Logger.output.puts "Processing #{group_name}"
+        Escort::Logger.output.puts "Processing #{group_name}"
 
-            if data.has_key?("delete_classes")
-              if delete_classes(group_name, data["delete_classes"])
-                update_group(group_name, classes: data["delete_classes"])
-              end
-            end
-
-            if data.has_key?("delete_params")
-              if delete_params(group_name, data["delete_params"])
-                update_group(group_name, classes: data["delete_params"])
-              end
-            end
-
-            if data.has_key?("classes")
-              if ensure_classes_and_params(group_name, data["classes"])
-                update_group(group_name, classes: data["classes"])
-              end
-            end
-
-            if data.has_key?("append_rules")
-              puts "XXXXXXXXXXXXXXX #{data}"
-              if ensure_rules(group_name, data["append_rules"])
-
-                update_group(group_name, rule: data["append_rules"])
-              end
-            end
-          }
-        rescue Psych::SyntaxError
-          Escort::Logger.error.error "Syntax error found in #{filename}, please fix and retry"
+        if data.has_key?("delete_classes")
+          if delete_classes(group_name, data["delete_classes"])
+            update_group(group_name, classes: data["delete_classes"])
+          end
         end
-      else
-        Escort::Logger.error.error "File not found: #{filename}"
-      end
+
+        if data.has_key?("delete_params")
+          if delete_params(group_name, data["delete_params"])
+            update_group(group_name, classes: data["delete_params"])
+          end
+        end
+
+        if data.has_key?("classes")
+          if ensure_classes_and_params(group_name, data["classes"])
+            update_group(group_name, classes: data["classes"])
+          end
+        end
+
+        if data.has_key?("append_rules")
+          if ensure_rules(group_name, data["append_rules"])
+            update_group(group_name, rule: data["append_rules"])
+          end
+        end
+      }
     end
 
     def self.delete_class(group, class_name)
@@ -314,7 +334,7 @@ module NCEdit
         group["rule"][1] << rule
         updated = true
       end
-puts "ZZZZZZZZZZZ #{group["rule"]}"
+
       updated
     end
 
@@ -329,9 +349,7 @@ puts "ZZZZZZZZZZZ #{group["rule"]}"
       if ! group["rule"] or group["rule"].empty?
         # no rules yet - just add our new one
         group["rule"] = [DEFAULT_RULE,[]]
-        puts "DEFAULT RULE ADDED"
       end
-      puts "rulezzzzzzzzzzz #{rules}"
       updated |= ensure_rule_conjunction(group, rules[0])
       rules[1].each { |rule|
         updated |= ensure_rule(group, rule)
@@ -342,7 +360,6 @@ puts "ZZZZZZZZZZZ #{group["rule"]}"
 
     def self.ensure_rule_conjunction(group, op)
       updated = false
-      puts "op <<<<#{op}"
       if ["and", "or"].include?(op)
         if group["rule"][0] != op
           group["rule"][0] = op

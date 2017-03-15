@@ -2,6 +2,38 @@ require "spec_helper"
 require "ncedit/cmd"
 
 RSpec.describe NCEdit::Cmd do
+  it "read_batch_data fails when no file specified" do
+    expect {NCEdit::Cmd.read_batch_data()}.to raise_error(/must/)
+  end
+
+  it "read_batch_data fails when both files specified" do
+    expect {NCEdit::Cmd.read_batch_data(json_file: "foo", yaml_file: "bar")}.to raise_error(/both/)
+  end
+
+  it "read_batch_data catches missing yaml file" do
+    expect {NCEdit::Cmd.read_batch_data(yaml_file: "nothere")}.to raise_error(/not found/)
+  end
+
+  it "read_batch_data catches missing json file" do
+    expect {NCEdit::Cmd.read_batch_data(json_file: "nothere")}.to raise_error(/not found/)
+  end
+
+  it "read_batch_data catches bad json syntax" do
+    expect {NCEdit::Cmd.read_batch_data(json_file: "./spec/fixtures/bad_json.json")}.to raise_error(/syntax/)
+  end
+
+  it "read_batch_data catches bad yaml syntax" do
+    expect {NCEdit::Cmd.read_batch_data(yaml_file: "./spec/fixtures/bad_yaml.yaml")}.to raise_error(/syntax/)
+  end
+
+  it "parses yaml file OK" do
+    NCEdit::Cmd.read_batch_data(yaml_file: "./doc/example/batch.yaml")
+  end
+
+  it "parses yaml file OK" do
+    NCEdit::Cmd.read_batch_data(json_file: "./doc/example/batch.json")
+  end
+
   it "delete_class removes class" do
     group = { "classes" => {"foo"=>{}}}
 

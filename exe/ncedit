@@ -56,22 +56,25 @@ Escort::App.create do |app|
   # end
 
   app.command :batch do |command|
-    command.summary "Batch processing from YAML"
-    command.description "Process a YAML file to add/delete classes, parameters and rules"
+    command.summary "Batch processing from YAML/JSON"
+    command.description "Process a YAML/JSON file to add/delete classes, parameters and rules"
     command.options do |opts|
-      opts.opt(:filename,
+      opts.opt(:yaml_file,
         'YAML file',
-        :long => '--filename',
+        :long => '--yaml-file',
+        :type => :string,
+      )
+      opts.opt(:json_file,
+        'JSON file',
+        :long => '--json-file',
         :type => :string,
       )
     end
     command.action do |options, arguments|
-      filename = options[:global][:commands][:batch][:options][:filename]
-      if filename == nil
-        Escort::Logger.error.error "Filename is required for batch updates"
-      else
-        NCEdit::Cmd::batch(filename)
-      end
+      yaml_file = options[:global][:commands][:batch][:options][:yaml_file]
+      json_file = options[:global][:commands][:batch][:options][:json_file]
+
+      NCEdit::Cmd::batch(yaml_file: yaml_file, json_file: json_file)
     end
   end
 end
