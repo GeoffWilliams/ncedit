@@ -4,6 +4,7 @@ require 'escort'
 
 module NCEdit
   module Cmd
+    DEFAULT_RULE = "or"
 
     def self.init(puppetclassify = nil)
       if puppetclassify
@@ -279,16 +280,26 @@ module NCEdit
       updated
     end
 
+    # Ensure a partualar rule exists in the group["rule"] array
+    # This affects only the items in the chain, eg:
+    # [
+    #  "or",
+    #   [
+    #     <--- here!
+    #   ]
+    # ]
+    #
+    # Only the rule to be added in should be passed as the rule parameter, eg:
+    # ["=", "name", "bob"]
     def self.ensure_rule(group, rule)
       updated = false
-      if ! group["rules"]
-        # no rules yet - just add our new one
-        group["rules"] = []
-      end
 
       # see if rule already exists, if it doesn't, append it
       found = false
-      group["rules"].each {|system_rule|
+
+      # rules are nested like this, the "or" applies to the whole rule chain:
+      # "rule"=>["or", ["=", "name", "bob"], ["=", "name", "hello"]]
+      group["rule"][1].each {|system_rule|
         if  system_rule[0] == rule[0] and
             system_rule[1] == rule[1] and
             system_rule[2] == rule[2]
@@ -298,18 +309,44 @@ module NCEdit
       }
       if ! found
         Escort::Logger.output.puts "Appending rule: #{rule}"
-        group["rules"] << rule
+        group["rule"][1] << rule
         updated = true
       end
+puts "ZZZZZZZZZZZ #{group["rule"]}"
+      updated
+    end
+
+    # rules need to arrive like this:
+    # ["or", ["=", "name", "pupper.megacorp.com"], ["=", "name", "pupper.megacorp.com"]]
+    # since the rule conjunction "or" can only be specified once per rule chain
+    # we will replace whatever already exists in the rule with what the user
+    # specified
+    def self.ensure_rules(group_name, rules)
+      updated = false
+      group = nc_group(group_name)
+      if ! group["rule"] or group["rule"].empty?
+        # no rules yet - just add our new one
+        group["rule"] = [DEFAULT_RULE,[]]
+        puts "DEFAULT RULE ADDED"
+      end
+      updated |= ensure_rule_conjunction(group, rules[0])
+      rules[1].each { |rule|
+        updated |= ensure_rule(group, rule)
+      }
 
       updated
     end
 
-    def self.ensure_rules(group_name, rules)
+    def self.ensure_rule_conjunction(group, op)
       updated = false
-      rules.each { |rule|
-        updated |= ensure_rule(nc_group(group_name), rule)
-      }
+      if ["and", "or"].include?(op)
+        if group["rule"][0] != op
+          group["rule"][0] = op
+          updated = true
+        end
+      else
+        raise "Illegal rule conjunction #{op}, allowed: 'and', 'or'"
+      end
 
       updated
     end

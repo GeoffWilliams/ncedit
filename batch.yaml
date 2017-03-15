@@ -20,7 +20,8 @@
 "Puppet Masters":
   "classes":
     "r_role::puppet::master_minimal": {}
-  # "append_rules":
-  #   - - "="
-  #     - "name"
-  #     - "vmpump02.puppet.com"
+  "append_rules":
+     - "or":
+       - "="
+       - "name"
+       - "vmpump02.puppet.com"

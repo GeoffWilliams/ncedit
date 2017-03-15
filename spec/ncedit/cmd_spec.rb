@@ -202,135 +202,177 @@ RSpec.describe NCEdit::Cmd do
   end
 
   it "ensures rules correctly" do
-    group = {"rules" => []}
+    group = {"rule" => nil}
 
     fake_pc = FakePuppetClassify.new(nil,nil)
     fake_pc.groups=(group)
     NCEdit::Cmd.init(fake_pc)
 
     update = NCEdit::Cmd.ensure_rules("test", [
-      ["=", "name", "vmpump02.puppet.com"],
-      ["=", "name", "vmpump03.puppet.com"]
+      "or",
+      [
+        ["=", "name", "vmpump02.puppet.com"],
+        ["=", "name", "vmpump03.puppet.com"],
+      ]
     ])
 
-    expect(group["rules"].size).to be == 2
-    expect(group["rules"][0][0]).to eq "="
-    expect(group["rules"][0][1]).to eq "name"
-    expect(group["rules"][0][2]).to eq "vmpump02.puppet.com"
+    expect(group["rule"].size).to be 2
+    expect(group["rule"][0]).to eq "or"
+    expect(group["rule"][1].size).to be 2
+    expect(group["rule"][1][0][0]).to eq "="
+    expect(group["rule"][1][0][1]).to eq "name"
+    expect(group["rule"][1][0][2]).to eq "vmpump02.puppet.com"
 
-    expect(group["rules"][1][0]).to eq "="
-    expect(group["rules"][1][1]).to eq "name"
-    expect(group["rules"][1][2]).to eq "vmpump03.puppet.com"
+    expect(group["rule"][1][1][0]).to eq "="
+    expect(group["rule"][1][1][1]).to eq "name"
+    expect(group["rule"][1][1][2]).to eq "vmpump03.puppet.com"
     expect(update).to be true
   end
 
   it "appends rules correctly" do
     # ensure_rules(group_name, data.dig("rules"))
-    group = {"rules" => [["=", "name", "vmpump02.puppet.com"]]}
+    group = {"rule" => ["or", [["=", "name", "vmpump02.puppet.com"]]]}
 
     fake_pc = FakePuppetClassify.new(nil,nil)
     fake_pc.groups=(group)
     NCEdit::Cmd.init(fake_pc)
 
     update = NCEdit::Cmd.ensure_rules("test", [
-      ["=", "fqdn", "vmpump03.puppet.com"],
-      ["=", "fqdn", "vmpump04.puppet.com"],
+      "or",
+      [
+        ["=", "fqdn", "vmpump03.puppet.com"],
+        ["=", "fqdn", "vmpump04.puppet.com"],
+      ]
     ])
 
-    expect(group["rules"].size).to be == 3
-    expect(group["rules"][0][0]).to eq "="
-    expect(group["rules"][0][1]).to eq "name"
-    expect(group["rules"][0][2]).to eq "vmpump02.puppet.com"
-    expect(group["rules"][1][0]).to eq "="
-    expect(group["rules"][1][1]).to eq "fqdn"
-    expect(group["rules"][1][2]).to eq "vmpump03.puppet.com"
-    expect(group["rules"][2][0]).to eq "="
-    expect(group["rules"][2][1]).to eq "fqdn"
-    expect(group["rules"][2][2]).to eq "vmpump04.puppet.com"
+    expect(group["rule"].size).to be 2
+    expect(group["rule"][0]).to eq "or"
+    expect(group["rule"][1].size).to be 3
+    expect(group["rule"][1][0][0]).to eq "="
+    expect(group["rule"][1][0][1]).to eq "name"
+    expect(group["rule"][1][0][2]).to eq "vmpump02.puppet.com"
+    expect(group["rule"][1][1][0]).to eq "="
+    expect(group["rule"][1][1][1]).to eq "fqdn"
+    expect(group["rule"][1][1][2]).to eq "vmpump03.puppet.com"
+    expect(group["rule"][1][2][0]).to eq "="
+    expect(group["rule"][1][2][1]).to eq "fqdn"
+    expect(group["rule"][1][2][2]).to eq "vmpump04.puppet.com"
     expect(update).to be true
   end
 
   it "ensures rules idempotently" do
     # ensure_rules(group_name, data.dig("rules"))
-    group = {"rules" => [["=", "name", "vmpump02.puppet.com"],["=", "name", "vmpump03.puppet.com"]]}
+    group = {"rule" => ["or", [["=", "name", "vmpump02.puppet.com"],["=", "name", "vmpump03.puppet.com"]]]}
 
     fake_pc = FakePuppetClassify.new(nil,nil)
     fake_pc.groups=(group)
     NCEdit::Cmd.init(fake_pc)
 
     update = NCEdit::Cmd.ensure_rules("test", [
-      ["=", "name", "vmpump02.puppet.com"],
-      ["=", "name", "vmpump03.puppet.com"],
+      "or",
+      [
+        ["=", "name", "vmpump02.puppet.com"],
+        ["=", "name", "vmpump03.puppet.com"],
+      ]
     ])
 
-    expect(group["rules"].size).to be == 2
-    expect(group["rules"][0][0]).to eq "="
-    expect(group["rules"][0][1]).to eq "name"
-    expect(group["rules"][0][2]).to eq "vmpump02.puppet.com"
-    expect(group["rules"][1][0]).to eq "="
-    expect(group["rules"][1][1]).to eq "name"
-    expect(group["rules"][1][2]).to eq "vmpump03.puppet.com"
+    expect(group["rule"].size).to be 2
+    expect(group["rule"][0]).to eq "or"
+    expect(group["rule"][1].size).to be 2
+    expect(group["rule"][1][0][0]).to eq "="
+    expect(group["rule"][1][0][1]).to eq "name"
+    expect(group["rule"][1][0][2]).to eq "vmpump02.puppet.com"
+    expect(group["rule"][1][1][0]).to eq "="
+    expect(group["rule"][1][1][1]).to eq "name"
+    expect(group["rule"][1][1][2]).to eq "vmpump03.puppet.com"
     expect(update).to be false
   end
 
   it "handles partial rule updates correctly" do
     # ensure_rules(group_name, data.dig("rules"))
-    group = {"rules" => [["=", "name", "vmpump02.puppet.com"]]}
+    group = {"rule" => ["or",[["=", "name", "vmpump02.puppet.com"]]]}
 
     fake_pc = FakePuppetClassify.new(nil,nil)
     fake_pc.groups=(group)
     NCEdit::Cmd.init(fake_pc)
 
     update = NCEdit::Cmd.ensure_rules("test", [
-      ["=", "name", "vmpump02.puppet.com"],
-      ["=", "name", "vmpump03.puppet.com"],
+      "or",
+      [
+        ["=", "name", "vmpump02.puppet.com"],
+        ["=", "name", "vmpump03.puppet.com"],
+      ]
     ])
 
-    expect(group["rules"].size).to be == 2
-    expect(group["rules"][0][0]).to eq "="
-    expect(group["rules"][0][1]).to eq "name"
-    expect(group["rules"][0][2]).to eq "vmpump02.puppet.com"
-    expect(group["rules"][1][0]).to eq "="
-    expect(group["rules"][1][1]).to eq "name"
-    expect(group["rules"][1][2]).to eq "vmpump03.puppet.com"
+    expect(group["rule"].size).to be 2
+    expect(group["rule"][0]).to eq "or"
+    expect(group["rule"][1].size).to be 2
+    expect(group["rule"][1][0][0]).to eq "="
+    expect(group["rule"][1][0][1]).to eq "name"
+    expect(group["rule"][1][0][2]).to eq "vmpump02.puppet.com"
+    expect(group["rule"][1][1][0]).to eq "="
+    expect(group["rule"][1][1][1]).to eq "name"
+    expect(group["rule"][1][1][2]).to eq "vmpump03.puppet.com"
     expect(update).to be true
   end
 
   it "ensure_rule creates new rule" do
-    group = { "rules" => nil}
+    group = { "rule" => ["or",[]]}
 
     update = NCEdit::Cmd.ensure_rule(group, ["=", "name", "vmpump02.puppet.com"])
-    expect(group["rules"].size).to be 1
-    expect(group["rules"][0][0]).to eq "="
-    expect(group["rules"][0][1]).to eq "name"
-    expect(group["rules"][0][2]).to eq "vmpump02.puppet.com"
+    expect(group["rule"].size).to be 2
+    expect(group["rule"][0]).to eq "or"
+    expect(group["rule"][1].size).to be 1
+    expect(group["rule"][1][0][0]).to eq "="
+    expect(group["rule"][1][0][1]).to eq "name"
+    expect(group["rule"][1][0][2]).to eq "vmpump02.puppet.com"
 
     expect(update).to be true
   end
 
   it "ensure_rule creates new rule idempotently" do
-    group = { "rules" => [["=", "name", "vmpump02.puppet.com"]]}
+    group = { "rule" => ["or", [["=", "name", "vmpump02.puppet.com"]]]}
 
     update = NCEdit::Cmd.ensure_rule(group, ["=", "name", "vmpump02.puppet.com"])
-    expect(group["rules"].size).to be 1
-    expect(group["rules"][0][0]).to eq "="
-    expect(group["rules"][0][1]).to eq "name"
-    expect(group["rules"][0][2]).to eq "vmpump02.puppet.com"
+    expect(group["rule"].size).to be 2
+    expect(group["rule"][0]).to eq "or"
+    expect(group["rule"][1].size).to be 1
+    expect(group["rule"][1][0][0]).to eq "="
+    expect(group["rule"][1][0][1]).to eq "name"
+    expect(group["rule"][1][0][2]).to eq "vmpump02.puppet.com"
 
     expect(update).to be false
   end
 
   it "ensure_rule appends to end of ruleset" do
-    group = { "rules" => [["=", "name", "vmpump02.puppet.com"]]}
+    group = { "rule" => ["or", [["=", "name", "vmpump02.puppet.com"]]]}
 
     update = NCEdit::Cmd.ensure_rule(group, ["=", "name", "vmpump03.puppet.com"])
-    expect(group["rules"].size).to be 2
-    expect(group["rules"][0][0]).to eq "="
-    expect(group["rules"][0][1]).to eq "name"
-    expect(group["rules"][0][2]).to eq "vmpump02.puppet.com"
-    expect(group["rules"][1][0]).to eq "="
-    expect(group["rules"][1][1]).to eq "name"
-    expect(group["rules"][1][2]).to eq "vmpump03.puppet.com"
+    expect(group["rule"].size).to be 2
+    expect(group["rule"][0]).to eq "or"
+    expect(group["rule"][1].size).to be 2
+    expect(group["rule"][1][0][0]).to eq "="
+    expect(group["rule"][1][0][1]).to eq "name"
+    expect(group["rule"][1][0][2]).to eq "vmpump02.puppet.com"
+    expect(group["rule"][1][1][0]).to eq "="
+    expect(group["rule"][1][1][1]).to eq "name"
+    expect(group["rule"][1][1][2]).to eq "vmpump03.puppet.com"
     expect(update).to be true
+  end
+
+  it "sets rule conjuction correctly" do
+    group = { "rule" => ["or", [["=", "name", "vmpump02.puppet.com"]]]}
+
+    update = NCEdit::Cmd.ensure_rule_conjunction(group, "and")
+    expect(update).to be true
+    expect(group["rule"][0]).to eq "and"
+  end
+
+  it "sets rule conjuction idempotently" do
+    group = { "rule" => ["and", [["=", "name", "vmpump02.puppet.com"]]]}
+
+    update = NCEdit::Cmd.ensure_rule_conjunction(group, "and")
+    expect(update).to be false
+    expect(group["rule"][0]).to eq "and"
   end
 end
