@@ -14,14 +14,16 @@
     - "puppet_enterprise::profile::masterbad"
 
   "delete_params":
-    "puppet_enterprise::profile::redo:":
-      - "badparam"
+    "puppet_enterprise::profile::mcollective::agent":
+      - "stomp_user"
 
 "Puppet Masters":
   "classes":
-    "r_role::puppet::master_minimal": {}
+    "pe_r10k":
+      "proxy": "proxy.megacorp.com:8080"
   "append_rules":
     - "or"
     - - "="
-      - "name"
-      - "pupper.puppet.com"
+      - - "fact"
+        - "ipaddress"
+      - "192.168.0.252"

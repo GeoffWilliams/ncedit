@@ -99,6 +99,33 @@ module NCEdit
       group
     end
 
+    # to see if our changes were saved or not we need to remove all nillified
+    # keys from both levels (class, parameter) of the class_delta array, since
+    # when we re-read from the NC our nillified data will be completely gone.  A
+    # naive comparison would then report a failure even though the operation
+    # succeeded.  On a practical level we must convert:
+    # {"puppet_enterprise"=>{"proxy"=>nil, "keep"=>"keep"}, "b"=>nil}
+    # ...to...
+    # {"puppet_enterprise"=>{"keep"=>"keep"}}
+    #
+    # @param nc_class The class hash as re-read from the NC API
+    # @param class_delta The class delta we originally requested (with nils for deletes)
+    def self.delta_saved?(nc_class, class_delta)
+      class_delta_reformatted = class_delta.map { |class_name, params|
+        if params == nil
+          # skip classes that are requested to be deleted for the moment since
+          # we will catch them on the outer pass
+      	  params_fixed = params
+        else
+          # remove all individual nullified parameters
+      	  params_fixed = params.reject{|param_name, param_value| param_value == nil}
+        end
+        [class_name,params_fixed]
+      }.to_h.reject { |class_name,params| params == nil}
+
+      nc_class == class_delta_reformatted
+    end
+
     def self.update_group(group_name, classes: nil, rule: nil)
       # group_delta will actually replace all classes/rules with whatever is
       # specified, so we need to merge this with any existing definition if
@@ -126,11 +153,11 @@ module NCEdit
       # now present.  If there was an error, then the user should have
       # previously seen some output since puppetclassify prints some useful
       # debug output
-      saved_group = nc_group(group_name)
-      if saved_group["classes"] == classes and saved_group["rule"] == rule
+      re_read_group = nc_group(group_name)
+      if delta_saved?(re_read_group["classes"], classes) and re_read_group["rule"] == rule
         Escort::Logger.output.puts "changes saved"
       else
-        Escort::Logger.error.error "re-read #{group_name} results in #{saved_group} should have delta of #{group_delta}"
+        Escort::Logger.error.error "re-read #{group_name} results in #{re_read_group} should have delta of #{group_delta}"
         raise "Error saving #{group_name}"
       end
     end
@@ -190,55 +217,73 @@ module NCEdit
       data.each { |group_name, data|
 
         Escort::Logger.output.puts "Processing #{group_name}"
+        group = nc_group(group_name)
 
+        #
+        # delete classes
+        #
         if data.has_key?("delete_classes")
-          if delete_classes(group_name, data["delete_classes"])
-            update_group(group_name, classes: data["delete_classes"])
+          changes = false
+
+          data["delete_classes"].each { |class_name|
+            changes |= ensure_class(group, class_name, delete:true)
+          }
+          if changes
+            update_group(group_name, classes: group["classes"])
           end
         end
 
+        #
+        # delete params
+        #
         if data.has_key?("delete_params")
-          if delete_params(group_name, data["delete_params"])
-            update_group(group_name, classes: data["delete_params"])
+          changes = false
+          data["delete_params"].each { |class_name, delete_params|
+            delete_params.each { | param_name|
+              changes |= ensure_class(group, class_name)
+              changes |= ensure_param(group, class_name, param_name, nil, delete:true)
+            }
+          }
+          if changes
+            update_group(group_name, classes: group["classes"])
           end
         end
 
+        #
+        # classes (and optionally params)
+        #
         if data.has_key?("classes")
-          if ensure_classes_and_params(group_name, data["classes"])
-            update_group(group_name, classes: data["classes"])
+          if ensure_classes_and_params(group, data["classes"])
+            update_group(group_name, classes: group["classes"])
           end
         end
 
+        #
+        # append rules
+        #
         if data.has_key?("append_rules")
-          if ensure_rules(group_name, data["append_rules"])
-            update_group(group_name, rule: data["append_rules"])
+          if ensure_rules(group, data["append_rules"])
+            update_group(group_name, rule: group["rule"])
           end
         end
       }
     end
 
-    def self.delete_class(group, class_name)
-      if group["classes"].delete(class_name)
+
+    # Classes are only removed when they have their parameters nilled so we must
+    # formulate special json to allow delete
+    # @see https://docs.puppet.com/pe/latest/nc_groups.html#post-v1groupsid
+    #
+    # Updates `group` to ensure that it now contains `class_name` (or marks it
+    # for deletion).  To commit changes, need to pass the updated
+    # `group['class']` hash to `update_group`
+    def self.ensure_class(group, class_name, delete:false)
+      if group["classes"].has_key?(class_name) and delete
+        # delete class by nilling its parameters
+        group["classes"][class_name] = nil
         changes = true
-      else
-        changes = false
-      end
-
-      changes
-    end
-
-    def self.delete_param(group, class_name, param_name)
-      if  group["classes"].has_key?(class_name) and
-          group["classes"][class_name].delete(param_name)
-        changes = true
-      else
-        changes = false
-      end
-      changes
-    end
-
-    def self.ensure_class(group, class_name)
-      if ! group["classes"].has_key?(class_name)
+      elsif ! group["classes"].has_key?(class_name) and ! delete
+        # create class because we are not deleting it and it doesn't exist yet
         group["classes"][class_name] = {}
         changes = true
       else
@@ -248,11 +293,20 @@ module NCEdit
       changes
     end
 
-    def self.ensure_param(group, class_name, param_name, param_value)
+    # Updates `group` to ensure that it now contains `param_name` set to
+    # `param_value` (or marks the parameter it for deletion).  To commit changes
+    # , need to pass the updated `group['class']` hash to `update_group`
+    def self.ensure_param(group, class_name, param_name, param_value, delete:false)
       # ensure parameter set if specified
-      if ! group["classes"][class_name].has_key?(param_name) or
-          group["classes"][class_name][param_name] != param_value
+      if ! delete and (
+            ! group["classes"][class_name].has_key?(param_name) or
+            group["classes"][class_name][param_name] != param_value
+          )
+        # update or add a new parameter
         group["classes"][class_name][param_name] = param_value
+        changes = true
+      elsif delete and group["classes"][class_name].has_key?(param_name)
+        group["classes"][class_name][param_name] = nil
         changes = true
       else
         changes = false
@@ -261,40 +315,19 @@ module NCEdit
       changes
     end
 
-    def self.delete_classes(group_name, data)
-      updated = false
-      if data
-        data.each{ |class_name|
-          Escort::Logger.output.puts "Deleting class: #{group_name}->#{class_name}"
-          updated |= delete_class(nc_group(group_name), class_name)
-        }
-      end
-      updated
-    end
-
-    def self.delete_params(group_name, data)
-      updated = false
-      if data
-        data.each{ |class_name, param_names|
-          param_names.each { |param_name|
-            Escort::Logger.output.puts "Deleting param: #{group_name}->#{class_name}=>#{param_name}"
-            updated |= delete_param(nc_group(group_name), class_name, param_name)
-          }
-        }
-      end
-      updated
-    end
-
-    def self.ensure_classes_and_params(group_name, data)
+    # Updates `group` to ensure that it now contains classes and parameters as
+    # specified in the `data` paramater.  To commit changes, need to pass the
+    # updated `group['class']` hash to `update_group`
+    def self.ensure_classes_and_params(group, data)
       updated = false
       if data
         data.each{ |class_name, params|
-          Escort::Logger.output.puts "ensuring class: #{group_name}->#{class_name}"
-          updated |= ensure_class(nc_group(group_name), class_name)
+          Escort::Logger.output.puts "ensuring class: #{group['name']}->#{class_name}"
+          updated |= ensure_class(group, class_name)
           if params
             params.each { |param_name, param_value|
-              Escort::Logger.output.puts "ensuring param: #{group_name}->#{class_name}->#{param_name}=#{param_value}"
-              updated |= ensure_param(nc_group(group_name), class_name, param_name, param_value)
+              Escort::Logger.output.puts "ensuring param: #{group['name']}->#{class_name}->#{param_name}=#{param_value}"
+              updated |= ensure_param(group, class_name, param_name, param_value)
             }
           end
         }
@@ -313,6 +346,8 @@ module NCEdit
     #
     # Only the rule to be added in should be passed as the rule parameter, eg:
     # ["=", "name", "bob"]
+    #
+    # To commit changes, need to pass the updated `group['rule']` hash to `update_group`
     def self.ensure_rule(group, rule)
       updated = false
 
@@ -321,7 +356,7 @@ module NCEdit
 
       # rules are nested like this, the "or" applies to the whole rule chain:
       # "rule"=>["or", ["=", "name", "bob"], ["=", "name", "hello"]]
-      group["rule"][1].each {|system_rule|
+      group["rule"].drop(1).each {|system_rule|
         if  system_rule[0] == rule[0] and
             system_rule[1] == rule[1] and
             system_rule[2] == rule[2]
@@ -331,33 +366,43 @@ module NCEdit
       }
       if ! found
         Escort::Logger.output.puts "Appending rule: #{rule}"
-        group["rule"][1] << rule
+        group["rule"].push(rule)
         updated = true
       end
 
       updated
     end
 
+    # Modify `group` to ensure the passed in `rules` exist. To commit changes,
+    # need to pass the updated `group['rule']` hash to `update_group`
+    #
     # rules need to arrive like this:
     # ["or", ["=", "name", "pupper.megacorp.com"], ["=", "name", "pupper.megacorp.com"]]
     # since the rule conjunction "or" can only be specified once per rule chain
     # we will replace whatever already exists in the rule with what the user
     # specified
-    def self.ensure_rules(group_name, rules)
+    def self.ensure_rules(group, rules)
       updated = false
-      group = nc_group(group_name)
+
       if ! group["rule"] or group["rule"].empty?
         # no rules yet - just add our new one
-        group["rule"] = [DEFAULT_RULE,[]]
+        group["rule"] = [DEFAULT_RULE]
       end
       updated |= ensure_rule_conjunction(group, rules[0])
-      rules[1].each { |rule|
+      rules.drop(1).each { |rule|
         updated |= ensure_rule(group, rule)
       }
 
       updated
     end
 
+    # Ensure the correct boolean conjunction ('and'/'or' - 'not' is not allowed)
+    # is being used for a given rule chain.  If user tried to append a rule with
+    # a different conjuction to the one currently in use we will change the
+    # conjuction used on the entire chain to match.
+    #
+    # Updates `group` in-place, To commit changes, need to pass the updated
+    # `group['rule']` hash to `update_group`
     def self.ensure_rule_conjunction(group, op)
       updated = false
       if ["and", "or"].include?(op)
@@ -370,6 +415,76 @@ module NCEdit
       end
 
       updated
+    end
+
+
+    def self.classes(options)
+      group_name    = options[:group_name]
+      class_name    = options[:class_name]
+      param_name    = options[:param_name]
+      param_value   = options[:param_value]
+      delete_class  = options[:delete_class]
+      delete_param  = options[:delete_param]
+      rule          = options[:rule]
+      rule_mode     = options[:rule_mode]
+
+      rule_change   = false
+      class_change  = false
+
+      if group_name
+        group = nc_group(group_name)
+      else
+        raise "All operations require a valid group_name"
+      end
+
+      rule_modes = ['replace', 'append']
+      if rule and (! rule_modes.include?(rule_mode))
+        raise "Invalid rule mode '#{rule_mode}'.  Allowed: #{rule_modes}"
+      end
+
+      if class_name and delete_class
+        # delete a class from a group
+        Escort::Logger.output.puts "Deleting class #{class_name} from #{group_name}"
+        class_change = ensure_class(group, class_name, delete:true)
+      elsif class_name and param_name and delete_param
+        # delete a parameter from a class
+        Escort::Logger.output.puts "Deleting parameter #{param_name} on #{class_name} from #{group_name}"
+        class_change = ensure_class(group, class_name)
+        class_change |= ensure_param(group, class_name, param_name, nil, delete:true)
+      elsif class_name and param_name and param_value
+        # set a value inside a class
+        Escort::Logger.output.puts "Setting parameter #{param_name} to #{param_value} on #{class_name} in #{group_name}"
+        class_change = ensure_class(group, class_name)
+        class_change |= ensure_param(group, class_name, param_name, param_value)
+      elsif class_name
+        Escort::Logger.output.puts "Adding #{class_name} to #{group_name}"
+        class_change = ensure_class(group, class_name)
+      end
+
+      # process any rule changes separately since they are valid for all actions
+      if rule
+        begin
+          rule_json = JSON.parse(rule)
+        rescue JSON::ParserError
+          raise "Syntax error in data supplied to --rule (must be valid JSON)"
+        end
+
+        if rule_mode == 'replace'
+          if group['rule'] != rule_json
+            group['rule'] = rule_json
+            rule_change = true
+          end
+        else
+          rule_change = ensure_rules(group, rule_json)
+        end
+      end
+
+      # save changes
+      if class_change or rule_change
+        update_group(group_name, classes: group["classes"], rule: group["rule"])
+      else
+        Escort::Logger.output.puts "Already up-to-date"
+      end
     end
   end
 end

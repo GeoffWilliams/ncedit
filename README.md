@@ -110,7 +110,54 @@ ncedit  batch --json-file /path/to/batch.json
 ```
 
 ## Making per-item changes
-* coming? (soon?) -- anyone want this?
+If you don't want to go to the hassle of creating a batch file or you have small, dynamic edits you wish to perform, your able to perform individual edits on the command line:
+
+### Add a class to group
+```shell
+ncedit --group-name FOO --class-name BAR
+```
+* Group will be created if it doesn't exist
+* Class MUST exist AND puppet must be aware of it (defeat caching) for the request to be accepted
+
+### Add a parameter to a class for a group
+```shell
+ncedit --group-name FOO --class-name BAR --param-name BAZ --param-value BAS
+```
+* Group will be created if it doesn't exist
+* Class will be added if it isn't already
+* Class MUST exist AND puppet must be aware of it (defeat caching) AND the parameter must exist on the class for the request to be accepted
+
+### Delete a parameter from a class inside a group
+```shell
+ncedit --group-name FOO --class-name BAR --param-name BAZ --delete-param
+```
+* Group will be created if it doesn't exist
+* Class will be added if it isn't already
+* Ensures the parameter `BAZ` is not set
+
+### Delete a class inside a group
+```shell
+ncedit --group-name FOO --class-name BAR --delete-class
+```
+* Group will be created if it doesn't exist
+* Ensures the class `BAR` is not defined
+
+### Replace all rules for group
+```shell
+ncedit --group-name FOO --rule 'JSON_FRAGMENT' --rule-mode replace
+```
+* Group will be created if it doesn't exist
+* Completely replaces existing rules for this group
+* Example JSON_FRAGMENT: `["and",["=",["fact","ipaddress"],"192.168.1.1"]]`
+
+### Append a rule to group
+```shell
+ncedit --group-name FOO --rule 'JSON_FRAGMENT' --rule-mode append
+```
+* Group will be created if it doesn't exist
+* Appends supplied JSON_FRAGMENT to the group's rules
+* Example JSON_FRAGMENT: `["and",["=",["fact","osfamily"],"RedHat"]]`
+* Notice in our example JSON_FRAGMENT that we have *kept* the outer `and` rule.  If we supply a conjuctive different to the rule's current value we will change it for the whole rule
 
 ## Troubleshooting
 * If you cannot install the `ncedit` gem and you are behind a corporate proxy, ensure that you have correctly set your `http_proxy` and `https_proxy` variables on the shell before running `gem install`.
@@ -121,6 +168,7 @@ bundle exec ncedit --verbosity debug  batch --yaml-file /path/to/batch.ya
 ```
 * Ensure you are running as `root` to avoid permission errors
 * If your shell can't find `ncedit` after successful installation and you installed into Puppet Enterprise's vendored ruby, make sure that your `PATH` contains `/opt/puppetlabs/puppet/bin` or run ncedit directly: `/opt/puppetlabs/puppet/bin/ncedit`
+* Don't attempt to debug the NC API through the PE console by capturing traffic, it uses a completely different API all of its own (In particular, there is another layer of boolean logic around rules).  Instead, use [NCIO](https://github.com/jeffmccune/ncio) to dump the current state of the NC API or see [Puppet's NC API documentation](https://docs.puppet.com/pe/latest/nc_index.html)
 
 ## Testing
 To run tests:

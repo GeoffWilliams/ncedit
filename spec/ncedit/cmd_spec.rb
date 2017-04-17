@@ -34,44 +34,6 @@ RSpec.describe NCEdit::Cmd do
     NCEdit::Cmd.read_batch_data(json_file: "./doc/example/batch.json")
   end
 
-  it "delete_class removes class" do
-    group = { "classes" => {"foo"=>{}}}
-
-    update = NCEdit::Cmd.delete_class(group, "foo")
-    expect(group["classes"].has_key?("foo")).to be false
-    expect(update).to be true
-  end
-
-  it "delete_class does not raise error when class already deleted" do
-    group = { "classes" => {"foo"=>nil}}
-
-    update = NCEdit::Cmd.delete_class(group, "bar")
-    expect(group["classes"].has_key?("foo")).to be true
-    expect(update).to be false
-  end
-
-  it "delete_param removes class" do
-    group = { "classes" => {"foo"=>{"bar"=>"baz"}}}
-
-    update = NCEdit::Cmd.delete_param(group, "foo", "bar")
-    expect(group["classes"]["foo"].has_key?("bar")).to be false
-    expect(update).to be true
-  end
-
-  it "delete_class does not raise error when param already deleted" do
-    group = { "classes" => {"foo"=>{"bar"=>"baz"}}}
-
-    update = NCEdit::Cmd.delete_param(group, "foo", "clive")
-    expect(group["classes"].has_key?("foo")).to be true
-    expect(update).to be false
-  end
-
-  it "delete_class does not raise error when class not present" do
-    group = { "classes" => {}}
-
-    update = NCEdit::Cmd.delete_param(group, "foo", "clive")
-    expect(update).to be false
-  end
 
   it "ensure_class creates new class" do
     group = { "classes" => {"foo" => {}}}
@@ -118,22 +80,23 @@ RSpec.describe NCEdit::Cmd do
     fake_pc.groups=(group)
     NCEdit::Cmd.init(fake_pc)
 
-    update = NCEdit::Cmd.delete_classes("test", ["foo","bar"])
-    expect(group["classes"].has_key?("foo")).to be false
-    expect(group["classes"].has_key?("bar")).to be false
+    update = NCEdit::Cmd.ensure_class(group, "foo", delete:true)
+    expect(group["classes"].has_key?("foo")).to be true
+    expect(group["classes"]["foo"]).to be nil
+    expect(group["classes"].has_key?("bar")).to be true
     expect(update).to be true
   end
 
   it "deletes classes idempotently" do
-    group = {"classes" => {"foo1"=>{}, "bar1"=>{}}}
+    # foo class gone...
+    group = {"classes" => {"bar"=>{}}}
 
     fake_pc = FakePuppetClassify.new(nil,nil)
     fake_pc.groups=(group)
     NCEdit::Cmd.init(fake_pc)
 
-    update = NCEdit::Cmd.delete_classes("test", ["foo","bar"])
-    expect(group["classes"].has_key?("foo1")).to be true
-    expect(group["classes"].has_key?("bar1")).to be true
+    # ... so we should NOT be told an update is needed
+    update = NCEdit::Cmd.ensure_class(group, "foo", delete:true)
     expect(update).to be false
   end
 
@@ -145,27 +108,30 @@ RSpec.describe NCEdit::Cmd do
     fake_pc.groups=(group)
     NCEdit::Cmd.init(fake_pc)
 
-    update = NCEdit::Cmd.delete_params("test", {"foo" => ["a", "b"]})
+    update = NCEdit::Cmd.ensure_param(group, "foo", "a", nil, delete:true)
     expect(group["classes"].has_key?("foo")).to be true
-    expect(group["classes"]["foo"].has_key?("a")).to be false
-    expect(group["classes"]["foo"].has_key?("b")).to be false
+    expect(group["classes"]["foo"].has_key?("a")).to be true
+    expect(group["classes"]["foo"]["a"]).to be nil
+    expect(group["classes"]["foo"].has_key?("b")).to be true
 
     expect(group["classes"]["bar"].has_key?("a")).to be true
     expect(update).to be true
   end
 
   it "deletes params idempotently" do
-    group = {"classes" => {"foo"=>{"a1"=>"a","b1"=>"b"}, "bar"=>{"a"=>"a"}}}
+    # a1 parameter already deleted from class foo...
+    group = {"classes" => {"foo"=>{"b"=>"b"}, "bar"=>{"a"=>"a"}}}
 
     fake_pc = FakePuppetClassify.new(nil,nil)
     fake_pc.groups=(group)
     NCEdit::Cmd.init(fake_pc)
 
-    update = NCEdit::Cmd.delete_params("test", {"foo" => ["a", "b"]})
+    update = NCEdit::Cmd.ensure_param(group, "foo", "a", nil, delete:true)
     expect(group["classes"].has_key?("foo")).to be true
-    expect(group["classes"]["foo"].has_key?("a1")).to be true
-    expect(group["classes"]["foo"].has_key?("b1")).to be true
+    expect(group["classes"]["foo"].has_key?("b")).to be true
+    expect(group["classes"]["bar"].has_key?("a")).to be true
 
+    # ...so check no updated flagged as needed
     expect(update).to be false
   end
 
@@ -176,7 +142,7 @@ RSpec.describe NCEdit::Cmd do
     fake_pc.groups=(group)
     NCEdit::Cmd.init(fake_pc)
 
-    update = NCEdit::Cmd.ensure_classes_and_params("test", {"foo" =>{}, "bar" => {}})
+    update = NCEdit::Cmd.ensure_classes_and_params(group, {"foo" =>{}, "bar" => {}})
     expect(group["classes"].has_key?("foo")).to be true
     expect(group["classes"].has_key?("bar")).to be true
 
@@ -190,7 +156,7 @@ RSpec.describe NCEdit::Cmd do
     fake_pc.groups=(group)
     NCEdit::Cmd.init(fake_pc)
 
-    update = NCEdit::Cmd.ensure_classes_and_params("test", {"foo" =>{}, "bar" => {}})
+    update = NCEdit::Cmd.ensure_classes_and_params(group, {"foo" =>{}, "bar" => {}})
     expect(group["classes"].has_key?("foo")).to be true
     expect(group["classes"].has_key?("bar")).to be true
 
@@ -204,7 +170,7 @@ RSpec.describe NCEdit::Cmd do
     fake_pc.groups=(group)
     NCEdit::Cmd.init(fake_pc)
 
-    update = NCEdit::Cmd.ensure_classes_and_params("test", {"foo" =>{"a"=>"a","b"=>"b"}, "bar" => {}})
+    update = NCEdit::Cmd.ensure_classes_and_params(group, {"foo" =>{"a"=>"a","b"=>"b"}, "bar" => {}})
     expect(group["classes"].has_key?("foo")).to be true
     expect(group["classes"]["foo"].has_key?("a")).to be true
     expect(group["classes"]["foo"]["a"]).to eq "a"
@@ -222,7 +188,7 @@ RSpec.describe NCEdit::Cmd do
     fake_pc.groups=(group)
     NCEdit::Cmd.init(fake_pc)
 
-    update = NCEdit::Cmd.ensure_classes_and_params("test", {"foo" =>{"a"=>"a","b"=>"b"}, "bar" => {}})
+    update = NCEdit::Cmd.ensure_classes_and_params(group, {"foo" =>{"a"=>"a","b"=>"b"}, "bar" => {}})
     expect(group["classes"].has_key?("foo")).to be true
     expect(group["classes"]["foo"].has_key?("a")).to be true
     expect(group["classes"]["foo"]["a"]).to eq "a"
@@ -233,14 +199,14 @@ RSpec.describe NCEdit::Cmd do
     expect(update).to be false
   end
 
-  it "ensures rules correctly" do
+  it "ensures rules to empty ruleset" do
     group = {"rule" => nil}
 
     fake_pc = FakePuppetClassify.new(nil,nil)
     fake_pc.groups=(group)
     NCEdit::Cmd.init(fake_pc)
 
-    update = NCEdit::Cmd.ensure_rules("test", [
+    update = NCEdit::Cmd.ensure_rules(group, [
       "or",
       [
         ["=", "name", "vmpump02.puppet.com"],
@@ -248,152 +214,129 @@ RSpec.describe NCEdit::Cmd do
       ]
     ])
 
-    expect(group["rule"].size).to be 2
-    expect(group["rule"][0]).to eq "or"
-    expect(group["rule"][1].size).to be 2
-    expect(group["rule"][1][0][0]).to eq "="
-    expect(group["rule"][1][0][1]).to eq "name"
-    expect(group["rule"][1][0][2]).to eq "vmpump02.puppet.com"
+    expected = [
+      "or",
+      [
+        ["=", "name", "vmpump02.puppet.com"],
+        ["=", "name", "vmpump03.puppet.com"],
+      ]
+    ]
 
-    expect(group["rule"][1][1][0]).to eq "="
-    expect(group["rule"][1][1][1]).to eq "name"
-    expect(group["rule"][1][1][2]).to eq "vmpump03.puppet.com"
+    expect(expected == group["rule"]).to be true
     expect(update).to be true
   end
 
   it "appends rules correctly" do
     # ensure_rules(group_name, data.dig("rules"))
-    group = {"rule" => ["or", [["=", "name", "vmpump02.puppet.com"]]]}
+    group = {"rule" => ["or", ["=", "name", "vmpump02.puppet.com"]]}
 
     fake_pc = FakePuppetClassify.new(nil,nil)
     fake_pc.groups=(group)
     NCEdit::Cmd.init(fake_pc)
 
-    update = NCEdit::Cmd.ensure_rules("test", [
+    update = NCEdit::Cmd.ensure_rules(group, [
       "or",
-      [
-        ["=", "fqdn", "vmpump03.puppet.com"],
-        ["=", "fqdn", "vmpump04.puppet.com"],
-      ]
+      ["=", ["fact","zigzag"], "vmpump03.puppet.com"],
+      ["=", "fqdn", "vmpump04.puppet.com"],
     ])
 
-    expect(group["rule"].size).to be 2
-    expect(group["rule"][0]).to eq "or"
-    expect(group["rule"][1].size).to be 3
-    expect(group["rule"][1][0][0]).to eq "="
-    expect(group["rule"][1][0][1]).to eq "name"
-    expect(group["rule"][1][0][2]).to eq "vmpump02.puppet.com"
-    expect(group["rule"][1][1][0]).to eq "="
-    expect(group["rule"][1][1][1]).to eq "fqdn"
-    expect(group["rule"][1][1][2]).to eq "vmpump03.puppet.com"
-    expect(group["rule"][1][2][0]).to eq "="
-    expect(group["rule"][1][2][1]).to eq "fqdn"
-    expect(group["rule"][1][2][2]).to eq "vmpump04.puppet.com"
+    expected = ["or",
+       ["=", "name", "vmpump02.puppet.com"],
+       ["=", ["fact", "zigzag"], "vmpump03.puppet.com"],
+       ["=", "fqdn", "vmpump04.puppet.com"]]
+
+    expect(group["rule"] == expected).to be true
     expect(update).to be true
   end
 
   it "ensures rules idempotently" do
     # ensure_rules(group_name, data.dig("rules"))
-    group = {"rule" => ["or", [["=", "name", "vmpump02.puppet.com"],["=", "name", "vmpump03.puppet.com"]]]}
+    group = {"rule" => [
+      "or",
+      ["=", "name", "vmpump02.puppet.com"],
+      ["=", "name", "vmpump03.puppet.com"]
+    ]}
 
     fake_pc = FakePuppetClassify.new(nil,nil)
     fake_pc.groups=(group)
     NCEdit::Cmd.init(fake_pc)
 
-    update = NCEdit::Cmd.ensure_rules("test", [
+    update = NCEdit::Cmd.ensure_rules(group, [
       "or",
-      [
-        ["=", "name", "vmpump02.puppet.com"],
-        ["=", "name", "vmpump03.puppet.com"],
-      ]
+      ["=", "name", "vmpump02.puppet.com"],
+      ["=", "name", "vmpump03.puppet.com"],
     ])
 
-    expect(group["rule"].size).to be 2
-    expect(group["rule"][0]).to eq "or"
-    expect(group["rule"][1].size).to be 2
-    expect(group["rule"][1][0][0]).to eq "="
-    expect(group["rule"][1][0][1]).to eq "name"
-    expect(group["rule"][1][0][2]).to eq "vmpump02.puppet.com"
-    expect(group["rule"][1][1][0]).to eq "="
-    expect(group["rule"][1][1][1]).to eq "name"
-    expect(group["rule"][1][1][2]).to eq "vmpump03.puppet.com"
+    expected = [
+      "or",
+      ["=", "name", "vmpump02.puppet.com"],
+      ["=", "name", "vmpump03.puppet.com"]
+    ]
+
+    expect(expected == group["rule"]).to be true
     expect(update).to be false
   end
 
   it "handles partial rule updates correctly" do
     # ensure_rules(group_name, data.dig("rules"))
-    group = {"rule" => ["or",[["=", "name", "vmpump02.puppet.com"]]]}
+    group = {"rule" => ["or",["=", "name", "vmpump02.puppet.com"]]}
 
     fake_pc = FakePuppetClassify.new(nil,nil)
     fake_pc.groups=(group)
     NCEdit::Cmd.init(fake_pc)
 
-    update = NCEdit::Cmd.ensure_rules("test", [
+    update = NCEdit::Cmd.ensure_rules(group, [
       "or",
-      [
-        ["=", "name", "vmpump02.puppet.com"],
-        ["=", "name", "vmpump03.puppet.com"],
-      ]
+      ["=", "name", "vmpump02.puppet.com"],
+      ["=", "name", "vmpump03.puppet.com"],
     ])
 
-    expect(group["rule"].size).to be 2
-    expect(group["rule"][0]).to eq "or"
-    expect(group["rule"][1].size).to be 2
-    expect(group["rule"][1][0][0]).to eq "="
-    expect(group["rule"][1][0][1]).to eq "name"
-    expect(group["rule"][1][0][2]).to eq "vmpump02.puppet.com"
-    expect(group["rule"][1][1][0]).to eq "="
-    expect(group["rule"][1][1][1]).to eq "name"
-    expect(group["rule"][1][1][2]).to eq "vmpump03.puppet.com"
+    expected = [
+      "or",
+      ["=", "name", "vmpump02.puppet.com"],
+      ["=", "name", "vmpump03.puppet.com"]
+    ]
+
+    expect(expected == group["rule"]).to be true
     expect(update).to be true
   end
 
   it "ensure_rule creates new rule" do
-    group = { "rule" => ["or",[]]}
+    group = { "rule" => ["or"]}
 
+    expected = ["or", ["=", "name", "vmpump02.puppet.com"]]
     update = NCEdit::Cmd.ensure_rule(group, ["=", "name", "vmpump02.puppet.com"])
-    expect(group["rule"].size).to be 2
-    expect(group["rule"][0]).to eq "or"
-    expect(group["rule"][1].size).to be 1
-    expect(group["rule"][1][0][0]).to eq "="
-    expect(group["rule"][1][0][1]).to eq "name"
-    expect(group["rule"][1][0][2]).to eq "vmpump02.puppet.com"
 
+    expect(expected == group["rule"]).to be true
     expect(update).to be true
   end
 
   it "ensure_rule creates new rule idempotently" do
-    group = { "rule" => ["or", [["=", "name", "vmpump02.puppet.com"]]]}
+    group = { "rule" => ["or", ["=", "name", "vmpump02.puppet.com"]]}
 
     update = NCEdit::Cmd.ensure_rule(group, ["=", "name", "vmpump02.puppet.com"])
-    expect(group["rule"].size).to be 2
-    expect(group["rule"][0]).to eq "or"
-    expect(group["rule"][1].size).to be 1
-    expect(group["rule"][1][0][0]).to eq "="
-    expect(group["rule"][1][0][1]).to eq "name"
-    expect(group["rule"][1][0][2]).to eq "vmpump02.puppet.com"
+    expected = ["or", ["=", "name", "vmpump02.puppet.com"]]
 
+    expect(expected == group["rule"]).to be true
     expect(update).to be false
   end
 
   it "ensure_rule appends to end of ruleset" do
-    group = { "rule" => ["or", [["=", "name", "vmpump02.puppet.com"]]]}
+    group = { "rule" => ["or", ["=", "name", "vmpump02.puppet.com"]]}
 
     update = NCEdit::Cmd.ensure_rule(group, ["=", "name", "vmpump03.puppet.com"])
-    expect(group["rule"].size).to be 2
-    expect(group["rule"][0]).to eq "or"
-    expect(group["rule"][1].size).to be 2
-    expect(group["rule"][1][0][0]).to eq "="
-    expect(group["rule"][1][0][1]).to eq "name"
-    expect(group["rule"][1][0][2]).to eq "vmpump02.puppet.com"
-    expect(group["rule"][1][1][0]).to eq "="
-    expect(group["rule"][1][1][1]).to eq "name"
-    expect(group["rule"][1][1][2]).to eq "vmpump03.puppet.com"
+    expected = [
+      "or",
+      ["=", "name", "vmpump02.puppet.com"],
+      ["=", "name", "vmpump03.puppet.com"]
+    ]
+
+    expect(expected == group["rule"]).to be true
     expect(update).to be true
   end
 
   it "sets rule conjuction correctly" do
-    group = { "rule" => ["or", [["=", "name", "vmpump02.puppet.com"]]]}
+    group = { "rule" => ["or", ["=", "name", "vmpump02.puppet.com"]]}
 
     update = NCEdit::Cmd.ensure_rule_conjunction(group, "and")
     expect(update).to be true
@@ -401,10 +344,64 @@ RSpec.describe NCEdit::Cmd do
   end
 
   it "sets rule conjuction idempotently" do
-    group = { "rule" => ["and", [["=", "name", "vmpump02.puppet.com"]]]}
+    group = { "rule" => ["and", ["=", "name", "vmpump02.puppet.com"]]}
 
     update = NCEdit::Cmd.ensure_rule_conjunction(group, "and")
     expect(update).to be false
     expect(group["rule"][0]).to eq "and"
   end
+
+  it "reports class delta saved for new class" do
+    nc_class    = {"foo" => {}}
+    class_delta = {"foo" => {}}
+
+    expect(NCEdit::Cmd.delta_saved?(nc_class, class_delta)).to be true
+  end
+
+  it "reports class delta not saved for new class" do
+    nc_class    = {}
+    class_delta = {"foo" => {}}
+
+    expect(NCEdit::Cmd.delta_saved?(nc_class, class_delta)).to be false
+  end
+
+  it "reports class delta saved for new param" do
+    nc_class    = {"foo" => {"bar"=>"baz"}}
+    class_delta = {"foo" => {"bar"=>"baz"}}
+
+    expect(NCEdit::Cmd.delta_saved?(nc_class, class_delta)).to be true
+  end
+
+  it "reports class delta not saved for new param" do
+    # wrong value
+    nc_class    = {"foo" => {"bar"=>"baz1"}}
+    class_delta = {"foo" => {"bar"=>"baz"}}
+    expect(NCEdit::Cmd.delta_saved?(nc_class, class_delta)).to be false
+
+    # missing value
+    nc_class    = {"foo" => {}}
+    class_delta = {"foo" => {"bar"=>"baz"}}
+    expect(NCEdit::Cmd.delta_saved?(nc_class, class_delta)).to be false
+
+    # missing class
+    nc_class    = {}
+    class_delta = {"foo" => {"bar"=>"baz"}}
+    expect(NCEdit::Cmd.delta_saved?(nc_class, class_delta)).to be false
+  end
+
+  it "reports class delta saved correctly for deleted class" do
+    nc_class    = {}
+    class_delta = {"foo" => nil}
+
+    expect(NCEdit::Cmd.delta_saved?(nc_class, class_delta)).to be true
+  end
+
+  it "reports class delta saved correctly for deleted param" do
+    nc_class    = {"foo" => {}}
+    class_delta = {"foo" => {"bar"=>nil}}
+
+    expect(NCEdit::Cmd.delta_saved?(nc_class, class_delta)).to be true
+  end
+
+
 end
