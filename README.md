@@ -5,7 +5,7 @@ ncedit is a small utility program that lets you edit the Puppet Enterprise Node 
 
 Why would you want to do this given that we have the excellent [node_manager](https://forge.puppet.com/WhatsARanjit/node_manager) module already on the forge?  Well... lots of reasons.  First off, using puppet code to drive the Node Classifier means that you have to have the `node_manager` module alread installed, which means that you must already have your [classification rules](https://docs.puppet.com/pe/latest/console_classes_groups_getting_started.html) in to reference the module through [Code Manager](https://docs.puppet.com/pe/latest/code_mgr.html).  You could in-theory use Puppet Enterprise's new idempotent installer (just reinstall puppet over the top of itself) to fix this exact issue but then you still have the problem of how to classify your master in order to activate any other new rules (eg node-ttl) you want to use, which are associated with a new [role](https://docs.puppet.com/pe/latest/r_n_p_intro.html) for the Puppet Master.
 
-That's where this tool comes in since all you need is root shell on the Puppet Master and a YAML or JSON file with the changes you want to make...
+That's where this tool comes in since all you need is root shell on the Puppet Master.
 
 ## Features
 You can:
@@ -16,7 +16,7 @@ You can:
 
 ...All from the convenience of the CLI.  This also allows this tool to be called from scripts and other systems in order to setup Puppet Enterprise the way you want and with the minimum of effort.
 
-For the moment, the edits to be carried out need to be placed into either a JSON or YAML file for bulk processing.  If there is interest, the tool will be enhanced to allow the above operations to be specified individually on the command line so to avoid the need to write YAML/JSON.
+You have a choice of running `ncedit` for each change you wish to make or collecting all of your edits into either a JSON or YAML file for bulk processing.
 
 ## Installation
 Install this tool on your Puppet Master (Master-of-Masters)
@@ -49,7 +49,7 @@ In each case the file needs to be ordered as follows:
       "OPTIONAL_PARAM_NAME": "VALUE_TO_SET"
   # Array of classes to delete
   "delete_classes":
-      - "CLASS_TO_DELETE"
+    - "CLASS_TO_DELETE"
   # Hash classes + Array of parameter names to delete
   "delete_params":
     "CLASS_TO_PROCESS":
@@ -97,7 +97,7 @@ In each case the file needs to be ordered as follows:
 * [Worked example](doc/example/batch.json)
 
 #### Ensuring changes
-* ncedit is idempotent so you may run the command as often as you like
+* `ncedit` is idempotent so you may run the command as often as you like
 
 ##### YAML
 ```shell
