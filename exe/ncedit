@@ -88,4 +88,12 @@ Escort::App.create do |app|
       NCEdit::Cmd::batch(yaml_file: yaml_file, json_file: json_file)
     end
   end
+
+  app.command :update_classes do |command|
+    command.summary "Refresh the classes available in the console"
+    command.description "Invalidate class cache and ask puppet to re-scan classes"
+    command.action do |options, arguments|
+      NCEdit::Cmd::update_classes()
+    end
+  end
 end

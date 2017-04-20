@@ -2,6 +2,7 @@ require 'puppetclassify'
 require 'yaml'
 require 'json'
 require 'escort'
+require 'puppet_https'
 
 module NCEdit
   module Cmd
@@ -55,6 +56,9 @@ module NCEdit
         end
 
         @puppetclassify = PuppetClassify.new(rest_api_url, auth_info)
+
+        # borrow the cool HTTPS requester built into puppetclassify
+        @puppet_https = PuppetHttps.new(auth_info)
       end
     end
 
@@ -485,6 +489,11 @@ module NCEdit
       else
         Escort::Logger.output.puts "Already up-to-date"
       end
+    end
+
+    def self.update_classes
+      @puppet_https.post("/v1/update-classes")
+      @puppet_https.delete("/puppet-admin-api/v1/environment-cache")
     end
   end
 end
