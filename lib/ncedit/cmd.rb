@@ -17,9 +17,12 @@ module NCEdit
         hostname = %x(facter fqdn).strip.downcase
         port = 4433
 
+
         # Define the url to the classifier API - we can't just do localhost because
         # the name has to match the SSL certificate
-        rest_api_url = "https://#{hostname}:#{port}/classifier-api"
+        base_url = "https://#{hostname}:"
+        @puppet_url = "#{base_url}8140"
+        @rest_api_url = "#{base_url}#{port}/classifier-api"
 
         # We need to authenticate against the REST API using a certificate
         # that is whitelisted in /etc/puppetlabs/console-services/rbac-certificate-whitelist.
@@ -55,7 +58,7 @@ module NCEdit
           end
         end
 
-        @puppetclassify = PuppetClassify.new(rest_api_url, auth_info)
+        @puppetclassify = PuppetClassify.new(@rest_api_url, auth_info)
 
         # borrow the cool HTTPS requester built into puppetclassify
         @puppet_https = PuppetHttps.new(auth_info)
@@ -492,8 +495,11 @@ module NCEdit
     end
 
     def self.update_classes
-      @puppet_https.post("/v1/update-classes")
-      @puppet_https.delete("/puppet-admin-api/v1/environment-cache")
+      if ! @puppetclassify
+        init
+      end
+      @puppet_https.delete("#{@puppet_url}/puppet-admin-api/v1/environment-cache")
+      @puppet_https.post("#{@rest_api_url}/v1/update-classes")
     end
   end
 end
