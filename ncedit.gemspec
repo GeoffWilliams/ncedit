@@ -26,6 +26,6 @@ Gem::Specification.new do |spec|
   spec.add_development_dependency "rspec", "~> 3.0"
 
   spec.add_runtime_dependency "escort", "0.4.0"
-  spec.add_runtime_dependency "json", "2.0.3"
-  spec.add_runtime_dependency "puppetclassify", "0.1.5"
+  spec.add_runtime_dependency "json_pure", "2.1.0"
+  spec.add_runtime_dependency "puppetclassify", "0.1.7"
 end

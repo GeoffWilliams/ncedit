@@ -112,16 +112,76 @@ ncedit  batch --json-file /path/to/batch.json
 ## Making per-item changes
 If you don't want to go to the hassle of creating a batch file or you have small, dynamic edits you wish to perform, your able to perform individual edits on the command line:
 
+
+### Practical examples
+One of the main uses of this tool is to configure Puppet Code Manager, so here are the exact commands you need (alternatively make a `batch.yaml` file to do it all in one hit):
+
+#### Code Manager R10K checkout URL
+```shell
+ncedit classes --group-name 'PE Master' \
+    --class-name puppet_enterprise::profile::master \
+    --param-name r10k_remote \
+    --param-value https://github.com/puppetlabs/control-repo
+```
+
+#### Code Manager SSH key
+```shell
+ncedit classes --group-name 'PE Master' \
+    --class-name puppet_enterprise::profile::master \
+    --param-name r10k_ \
+    --param-value /etc/puppetlabs/puppetserver/ssh/id_rsa
+```
+
+#### Code Manager proxy server
+```shell
+ncedit classes --group-name 'PE Master' \
+    --class-name puppet_enterprise::profile::master \
+    --param-name r10k_proxy \
+    --param-value http://proxy.megacorp.com:3128
+```
+
+
+#### Enable Code Manager
+```shell
+ncedit classes --group-name 'PE Master' \
+    --class-name puppet_enterprise::profile::master \
+    --param-name code_manager_auto_configure \
+    --param-value true
+    
+ncedit classes --group-name 'PE Master' \
+    --class-name puppet_enterprise::profile::master \
+    --param-name file_sync_enabled \
+    --param-value automatic
+```
+
+
+#### Add a rule to configure the puppet master with extra classes
+```shell
+ncedit classes --group-name "Puppet Masters" \
+    --class-name role::my_puppet_master \
+    --rule '["and", ["=",["fact","fqdn"],"'$(facter fqdn)'"]]' \
+    --rule-mode replace
+```
+
+* Creat a new group called `Puppet Masters`
+* Make it load the role `role::my_puppet_master`
+* Have it match any host matching the FQDN of the host the command was run from and replace any existing rules for the group
+
+#### Refresh the list of classes in the console
+```shell
+ncedit update_classes
+```
+
 ### Add a class to group
 ```shell
-ncedit --group-name FOO --class-name BAR
+ncedit classes --group-name FOO --class-name BAR
 ```
 * Group will be created if it doesn't exist
 * Class MUST exist AND puppet must be aware of it (defeat caching) for the request to be accepted
 
 ### Add a parameter to a class for a group
 ```shell
-ncedit --group-name FOO --class-name BAR --param-name BAZ --param-value BAS
+ncedit classes --group-name FOO --class-name BAR --param-name BAZ --param-value BAS
 ```
 * Group will be created if it doesn't exist
 * Class will be added if it isn't already
@@ -129,7 +189,7 @@ ncedit --group-name FOO --class-name BAR --param-name BAZ --param-value BAS
 
 ### Delete a parameter from a class inside a group
 ```shell
-ncedit --group-name FOO --class-name BAR --param-name BAZ --delete-param
+ncedit classes --group-name FOO --class-name BAR --param-name BAZ --delete-param
 ```
 * Group will be created if it doesn't exist
 * Class will be added if it isn't already
@@ -137,14 +197,14 @@ ncedit --group-name FOO --class-name BAR --param-name BAZ --delete-param
 
 ### Delete a class inside a group
 ```shell
-ncedit --group-name FOO --class-name BAR --delete-class
+ncedit classes --group-name FOO --class-name BAR --delete-class
 ```
 * Group will be created if it doesn't exist
 * Ensures the class `BAR` is not defined
 
 ### Replace all rules for group
 ```shell
-ncedit --group-name FOO --rule 'JSON_FRAGMENT' --rule-mode replace
+ncedit classes --group-name FOO --rule 'JSON_FRAGMENT' --rule-mode replace
 ```
 * Group will be created if it doesn't exist
 * Completely replaces existing rules for this group
@@ -152,7 +212,7 @@ ncedit --group-name FOO --rule 'JSON_FRAGMENT' --rule-mode replace
 
 ### Append a rule to group
 ```shell
-ncedit --group-name FOO --rule 'JSON_FRAGMENT' --rule-mode append
+ncedit classes --group-name FOO --rule 'JSON_FRAGMENT' --rule-mode append
 ```
 * Group will be created if it doesn't exist
 * Appends supplied JSON_FRAGMENT to the group's rules
