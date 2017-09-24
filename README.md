@@ -163,7 +163,7 @@ ncedit classes --group-name "Puppet Masters" \
     --rule-mode replace
 ```
 
-* Creat a new group called `Puppet Masters`
+* Create a new group called `Puppet Masters`
 * Make it load the role `role::my_puppet_master`
 * Have it match any host matching the FQDN of the host the command was run from and replace any existing rules for the group
 
