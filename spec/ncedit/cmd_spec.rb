@@ -403,5 +403,82 @@ RSpec.describe NCEdit::Cmd do
     expect(NCEdit::Cmd.delta_saved?(nc_class, class_delta)).to be true
   end
 
+  it "reports if a parameter belongs to r10k settings correctly" do
+    expect(NCEdit::Cmd.is_r10k_param("puppet_enterprise::profile::master", "r10k_remote")).to be true
+    expect(NCEdit::Cmd.is_r10k_param("puppet_enterprise::profile::master", "r10k_proxy")).to be true
+    expect(NCEdit::Cmd.is_r10k_param("puppet_enterprise::profile::master", "r10k_postrun")).to be true
+    expect(NCEdit::Cmd.is_r10k_param("puppet_enterprise::profile::master", "r10k_private_key")).to be true
+    expect(NCEdit::Cmd.is_r10k_param("puppet_enterprise::profile::master", "code_manager_auto_configure")).to be true
+
+    # protect against namespace clash
+    expect(NCEdit::Cmd.is_r10k_param("puppet_enterprise::profile::masterX", "r10k_remote")).to be false
+    expect(NCEdit::Cmd.is_r10k_param("puppet_enterprise::profile::masterX", "r10k_proxy")).to be false
+    expect(NCEdit::Cmd.is_r10k_param("puppet_enterprise::profile::masterX", "r10k_postrun")).to be false
+    expect(NCEdit::Cmd.is_r10k_param("puppet_enterprise::profile::masterX", "r10k_private_key")).to be false
+    expect(NCEdit::Cmd.is_r10k_param("puppet_enterprise::profile::masterX", "code_manager_auto_configure")).to be false
+  end
+
+
+  it "reports r10k settings found correctly" do
+    data = {
+      "frog"=> {},
+      "ocean" => {
+        "classes" => {
+          "blah" => {
+            "a" => "a",
+          }
+        }
+      },
+      "PE Masters" => {
+        "classes" => {
+          "puppet_enterprise::profile::master" => {
+            "code_manager_auto_configure" => true,
+            "r10k_remote" => "https://github.com/GeoffWilliams/r10k-control",
+            "r10k_private_key" => "/etc/puppetlabs/puppetserver/ssh/id-control_repo.rsa",
+          },
+          "my_other_class" => {}
+        }
+      }
+    }
+    res = NCEdit::Cmd.contains_r10k_settings(data)
+    expect(res.class).to eq Hash
+    expect(res.size).to eq 1
+    expect(res.key?("PE Masters")).to be true
+    expect(res["PE Masters"].key?("classes")).to be true
+    expect(res["PE Masters"]["classes"].key?("puppet_enterprise::profile::master")).to be true
+    expect(res["PE Masters"]["classes"]["puppet_enterprise::profile::master"].key?("code_manager_auto_configure")).to be true
+    expect(res["PE Masters"]["classes"]["puppet_enterprise::profile::master"].key?("r10k_remote")).to be true
+    expect(res["PE Masters"]["classes"]["puppet_enterprise::profile::master"].key?("r10k_private_key")).to be true
+
+    expect(res["PE Masters"]["classes"]["puppet_enterprise::profile::master"]["code_manager_auto_configure"]).to be true
+    expect(res["PE Masters"]["classes"]["puppet_enterprise::profile::master"]["r10k_remote"]).to eq "https://github.com/GeoffWilliams/r10k-control"
+    expect(res["PE Masters"]["classes"]["puppet_enterprise::profile::master"]["r10k_private_key"]).to eq "/etc/puppetlabs/puppetserver/ssh/id-control_repo.rsa"
+  end
+
+  it "reports r10k settings not found correctly" do
+    data = {
+      "PE Masters" => {
+        "classes" => {
+          "puppet_enterprise::profile::master" => {
+              "notarealparam" => "/etc/puppetlabs/puppetserver/ssh/id-control_repo.rsa",
+          }
+        }
+      }
+    }
+    expect(NCEdit::Cmd.contains_r10k_settings(data)).to be false
+
+    data = {
+      "My Group" => {
+        "classes" => {
+          "a_different_class" => {
+              "example" => "abc",
+          }
+        }
+      }
+    }
+    expect(NCEdit::Cmd.contains_r10k_settings(data)).to be false
+
+  end
+
 
 end

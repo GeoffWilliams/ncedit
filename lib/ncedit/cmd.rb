@@ -8,6 +8,15 @@ module NCEdit
   module Cmd
     DEFAULT_RULE = "or"
 
+    R10K_SETTINGS_CLASS = "puppet_enterprise::profile::master"
+    R10K_SETTINGS_PARAMS = [
+        "code_manager_auto_configure",
+        "r10k_remote",
+        "r10k_private_key",
+        "r10k_proxy",
+        "r10k_postrun",
+    ]
+
     def self.init(puppetclassify = nil)
       if puppetclassify
         # use passed in puppetclassify if present - allows injection for easy
@@ -213,14 +222,23 @@ module NCEdit
     #         'badparam'
     #
     # 'Puppet Masters':
-    #   'clases':
+    #   'classes':
     #     'role::puppet::master':
     #   'append_rules':
     #     - - "="
     #       - "name"
     #       - "vmpump02.puppet.com"
-    def self.batch(yaml_file: nil, json_file: nil)
+    def self.batch(yaml_file: nil, json_file: nil, smart_update: false)
       data = read_batch_data(yaml_file: yaml_file, json_file: json_file)
+
+      if smart_update
+        needs_reclassify = contains_r10k_settings(data)
+        if needs_reclassify
+          apply_r10k_settings_now(needs_reclassify)
+        end
+        puppet_code_deploy
+      end
+
       data.each { |group_name, data|
 
         Escort::Logger.output.puts "Processing #{group_name}"
@@ -342,7 +360,7 @@ module NCEdit
       updated
     end
 
-    # Ensure a partualar rule exists in the group["rule"] array
+    # Ensure a particular rule exists in the group["rule"] array
     # This affects only the items in the chain, eg:
     # [
     #  "or",
@@ -424,7 +442,6 @@ module NCEdit
       updated
     end
 
-
     def self.classes(options)
       group_name    = options[:group_name]
       class_name    = options[:class_name]
@@ -434,6 +451,7 @@ module NCEdit
       delete_param  = options[:delete_param]
       rule          = options[:rule]
       rule_mode     = options[:rule_mode]
+      smart_update  = options[:smart_update]
 
       rule_change   = false
       class_change  = false
@@ -460,10 +478,21 @@ module NCEdit
         class_change |= ensure_param(group, class_name, param_name, nil, delete:true)
       elsif class_name and param_name and param_value
         # set a value inside a class
+        if smart_update
+          if ! is_r10k_param(class_name, param_name)
+
+            # not an R10K parameter, do an immediate update to make sure any classes
+            # we need are in-place
+            puppet_code_deploy
+          end
+        end
         Escort::Logger.output.puts "Setting parameter #{param_name} to #{param_value} on #{class_name} in #{group_name}"
         class_change = ensure_class(group, class_name)
         class_change |= ensure_param(group, class_name, param_name, param_value)
       elsif class_name
+        if smart_update
+          puppet_code_deploy
+        end
         Escort::Logger.output.puts "Adding #{class_name} to #{group_name}"
         class_change = ensure_class(group, class_name)
       end
@@ -500,6 +529,70 @@ module NCEdit
       end
       @puppet_https.delete("#{@puppet_url}/puppet-admin-api/v1/environment-cache")
       @puppet_https.post("#{@rest_api_url}/v1/update-classes")
+    end
+
+    def self.puppet_code_deploy
+      Escort::Logger.output.puts "Running puppet and deploying code..."
+
+      # if puppet run fails, just deploy the code anyway as the fix needed might
+      # be in the update...
+      system("puppet agent -t ; puppet-code deploy --all --wait")
+    end
+
+    # Extract the r10k settings ONLY from the passed in data has and update
+    # NCAPI with them immediately
+    def self.apply_r10k_settings_now(data)
+      data.each { |group_name,opts|
+        group = nc_group(group_name)
+
+        if opts.key?("classes")
+          Escort::Logger.output.puts "Setting up rules for #{group_name} immediately"
+          if ensure_classes_and_params(group, opts["classes"])
+            update_group(group_name, classes: group["classes"])
+          end
+        end
+      }
+    end
+
+    # Check if this is an r10k parameter or not
+    #
+    # @return true if this is to do with R10K otherwise false
+    def self.is_r10k_param(class_name, param_name)
+      class_name == R10K_SETTINGS_CLASS and R10K_SETTINGS_PARAMS.include?(param_name)
+    end
+
+    # Evaluate whether change instructions contain R10K settings or not
+    #
+    # @param data Hash of data settings to look at
+    # @return false if not found otherwise hash of with just the settings that
+    #   need to be applied immediately
+    def self.contains_r10k_settings(data)
+      found = {}
+      data.each { |group_name, opts|
+        if opts.key?("classes") and opts["classes"].key?(R10K_SETTINGS_CLASS)
+          opts["classes"][R10K_SETTINGS_CLASS].each { |param_name,param_value|
+            if is_r10k_param(R10K_SETTINGS_CLASS, param_name)
+              # make the hash structure we need
+              if ! found.key?(group_name)
+                found[group_name] = {}
+              end
+
+              if ! found[group_name].key?("classes")
+                found[group_name]["classes"] = {}
+              end
+
+              if ! found[group_name]["classes"].key?(R10K_SETTINGS_CLASS)
+                found[group_name]["classes"][R10K_SETTINGS_CLASS] = {}
+              end
+
+              found[group_name]["classes"][R10K_SETTINGS_CLASS][param_name] = param_value
+            end
+          }
+        end
+      }
+
+      # Return the found elements if there were any, otherwise simplify to false
+      ! found.empty? ? found : false
     end
   end
 end

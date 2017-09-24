@@ -6,12 +6,13 @@ require 'ncedit/version'
 Gem::Specification.new do |spec|
   spec.name          = "ncedit"
   spec.version       = NCEdit::VERSION
-  spec.authors       = ["Geoff Williams"]
-  spec.email         = ["geoff@geoffwilliams.me.uk"]
+  spec.authors       = ["Declarative Systems"]
+  spec.email         = ["sales@declarativesystems.com"]
+  spec.license       = "Apache-2.0"
 
   spec.summary       = %q{Edit Puppet Enterprise Node Classifier rules}
   spec.description   = %q{Use the puppet-classify gem to create/edit NC rules}
-  spec.homepage      = "https://github.com/GeoffWilliams/ncedit"
+  spec.homepage      = "https://github.com/declarativesystems/ncedit"
 
 
   spec.files         = `git ls-files -z`.split("\x0").reject do |f|

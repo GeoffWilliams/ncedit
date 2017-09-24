@@ -6,6 +6,11 @@ require 'ncedit/cmd'
 # display help if nothing specified
 ARGV.push('-h') if ARGV.empty?
 
+# Add the path to the puppet-code command as a fallback.  It's last to
+# allow user to override via the real PATH if necessary
+ENV['PATH'] = "#{ENV['PATH']}:/opt/puppetlabs/puppet/bin/:/opt/puppetlabs/client-tools/bin/"
+
+
 Escort::App.create do |app|
   app.version NCEdit::VERSION
   app.summary "ncedit"
@@ -59,7 +64,11 @@ Escort::App.create do |app|
         :long    => '--rule-mode',
         :type    => :string,
       )
-
+      opts.opt(:smart_update,
+        'Smart update',
+        :long => '--smart-update',
+        :type => :boolean,
+      )
     end
     command.action do |options, arguments|
       NCEdit::Cmd::classes(options[:global][:commands][:classes][:options])
@@ -80,12 +89,18 @@ Escort::App.create do |app|
         :long => '--json-file',
         :type => :string,
       )
+      opts.opt(:smart_update,
+        'Smart update',
+        :long => '--smart-update',
+        :type => :boolean,
+      )
     end
     command.action do |options, arguments|
       yaml_file = options[:global][:commands][:batch][:options][:yaml_file]
       json_file = options[:global][:commands][:batch][:options][:json_file]
+      smart_update = options[:global][:commands][:batch][:options][:smart_update]
 
-      NCEdit::Cmd::batch(yaml_file: yaml_file, json_file: json_file)
+      NCEdit::Cmd::batch(yaml_file: yaml_file, json_file: json_file, smart_update: smart_update)
     end
   end
 
