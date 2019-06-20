@@ -1,4 +1,4 @@
-[![Build Status](https://travis-ci.org/GeoffWilliams/ncedit.svg?branch=master)](https://travis-ci.org/GeoffWilliams/ncedit)
+[![Build Status](https://travis-ci.org/declarativesystems/ncedit.svg?branch=master)](https://travis-ci.org/declarativesystems/ncedit)
 # ncedit - Puppet Node Classifier CLI editor
 
 ncedit is a small utility program that lets you edit the Puppet Enterprise Node Classifier rules from the command line.

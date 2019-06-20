@@ -237,6 +237,9 @@ module NCEdit
           apply_r10k_settings_now(needs_reclassify)
         end
         puppet_code_deploy
+
+        Escort::Logger.output.puts "Sleep for 60 seconds to let classes finish their refresh..."
+        sleep(60)
       end
 
       data.each { |group_name, data|
