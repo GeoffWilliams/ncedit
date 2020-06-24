@@ -13,6 +13,7 @@ You can:
 * Add or remove classes
 * Add or remove class parameters
 * Add or remove rules
+* Add or edit environment groups
 
 ...All from the convenience of the CLI.  This allows us to be called from scripts and other systems in order to setup Puppet Enterprise the way you want and with the minimum of effort.
 
@@ -222,6 +223,14 @@ ncedit classes --group-name FOO --rule 'JSON_FRAGMENT' --rule-mode append
 * Appends supplied JSON_FRAGMENT to the group's rules
 * Example JSON_FRAGMENT: `["and",["=",["fact","osfamily"],"RedHat"]]`
 * Notice in our example JSON_FRAGMENT that we have *kept* the outer `and` rule.  If we supply a conjuctive different to the rule's current value we will change it for the whole rule
+
+### Add/edit an environment group (experimental)
+
+```shell
+ncedit groups --group-name "Agent-specified environment" --environment agent-specified --environment-trumps --rule '["~",["fact","fqdn"],".*"]' --rule-mode replace
+```
+* Group will be created if it doesn't exit
+* Will be nested under `All Environments` 
 
 ## Smart updates
 The NC API will only accept rules for classes that currently exist on the system, so its likely that your rules will be rejected if they have not yet been deployed to the master.  To make this process as seamless as possible, the `--smart-update` option will perform this task for you as-and-when required.  This assumes you have already setup RBAC to grant access to Code Manager, this can be done in a single command using the [pe_rbac gem](https://github.com/declarativesystems/pe_rbac#setting-up-code-manager-on-the-command-line)

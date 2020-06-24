@@ -75,7 +75,7 @@ module NCEdit
     end
 
     # Fetch a group by ID, make the group if it doesn't already exist
-    def self.nc_group_id(group_name)
+    def self.nc_group_id(group_name, parent_name: "All Nodes")
       if ! @puppetclassify
         init
       end
@@ -86,7 +86,7 @@ module NCEdit
         res = @puppetclassify.groups.create_group(
           {
             "name"    => group_name,
-            "parent"  => @puppetclassify.groups.get_group_id("All Nodes"),
+            "parent"  => @puppetclassify.groups.get_group_id(parent_name),
             "classes" => {},
           }
         )
@@ -101,14 +101,14 @@ module NCEdit
       group_id
     end
 
-    def self.nc_group(group_name)
+    def self.nc_group(group_name, parent_name:nil)
       if ! @puppetclassify
         init
       end
       # Get the wanted group from the API
       #   1. Get the id of the wanted group
       #   2. Use the id to fetch the group
-      group_id  = nc_group_id(group_name)
+      group_id = nc_group_id(group_name, parent_name: parent_name)
       Escort::Logger.output.puts "Group #{group_name} found, getting definition"
       group = @puppetclassify.groups.get_group(group_id)
 
@@ -142,7 +142,7 @@ module NCEdit
       nc_class == class_delta_reformatted
     end
 
-    def self.update_group(group_name, classes: nil, rule: nil)
+    def self.update_group(group_name, classes: nil, rule: nil, environment: nil, environment_trumps: nil)
       # group_delta will actually replace all classes/rules with whatever is
       # specified, so we need to merge this with any existing definition if
       # one of these fields is not needed for a particular update otherwise
@@ -155,10 +155,20 @@ module NCEdit
         rule = nc_group(group_name)["rule"]
       end
 
+      if environment == nil
+        environment = nc_group(group_name)["environment"]
+      end
+
+      if ! environment_trumps
+        environment_trumps = nc_group(group_name)["environment_trumps"]
+      end
+
       group_delta = {
-        'id'      => nc_group_id(group_name),
-        'rule'    => rule,
-        'classes' => classes,
+        'id'                  => nc_group_id(group_name),
+        'rule'                => rule,
+        'classes'             => classes,
+        'environment'         => environment,
+        'environment_trumps'  => environment_trumps,
       }
       res = @puppetclassify.groups.update_group(group_delta)
 
@@ -170,7 +180,10 @@ module NCEdit
       # previously seen some output since puppetclassify prints some useful
       # debug output
       re_read_group = nc_group(group_name)
-      if delta_saved?(re_read_group["classes"], classes) and re_read_group["rule"] == rule
+      if delta_saved?(re_read_group["classes"], classes) &&
+          re_read_group["rule"] == rule &&
+          re_read_group["environment"] == environment &&
+          re_read_group["environment_trumps"] == environment_trumps
         Escort::Logger.output.puts "changes saved"
       else
         Escort::Logger.error.error "re-read #{group_name} results in #{re_read_group} should have delta of #{group_delta}"
@@ -445,6 +458,36 @@ module NCEdit
       updated
     end
 
+    # process any rule changes separately since they are valid for all actions
+    # returns true if changes were made
+    def self.rule_change(group, rule, rule_mode)
+      rule_change = false
+
+      rule_modes = ['replace', 'append']
+      if rule and (! rule_modes.include?(rule_mode))
+        raise "Invalid rule mode '#{rule_mode}'.  Allowed: #{rule_modes}"
+      end
+
+      if rule
+        begin
+          rule_json = JSON.parse(rule)
+        rescue JSON::ParserError
+          raise "Syntax error in data supplied to --rule (must be valid JSON)"
+        end
+
+        if rule_mode == 'replace'
+          if group['rule'] != rule_json
+            group['rule'] = rule_json
+            rule_change = true
+          end
+        else
+          rule_change = ensure_rules(group, rule_json)
+        end
+      end
+
+      rule_change
+    end
+
     def self.classes(options)
       group_name    = options[:group_name]
       class_name    = options[:class_name]
@@ -463,11 +506,6 @@ module NCEdit
         group = nc_group(group_name)
       else
         raise "All operations require a valid group_name"
-      end
-
-      rule_modes = ['replace', 'append']
-      if rule and (! rule_modes.include?(rule_mode))
-        raise "Invalid rule mode '#{rule_mode}'.  Allowed: #{rule_modes}"
       end
 
       if class_name and delete_class
@@ -501,22 +539,7 @@ module NCEdit
       end
 
       # process any rule changes separately since they are valid for all actions
-      if rule
-        begin
-          rule_json = JSON.parse(rule)
-        rescue JSON::ParserError
-          raise "Syntax error in data supplied to --rule (must be valid JSON)"
-        end
-
-        if rule_mode == 'replace'
-          if group['rule'] != rule_json
-            group['rule'] = rule_json
-            rule_change = true
-          end
-        else
-          rule_change = ensure_rules(group, rule_json)
-        end
-      end
+      rule_change = rule_change(group, rule, rule_mode)
 
       # save changes
       if class_change or rule_change
@@ -596,6 +619,32 @@ module NCEdit
 
       # Return the found elements if there were any, otherwise simplify to false
       ! found.empty? ? found : false
+    end
+
+    def self.groups(options)
+      group_name          = options[:group_name]
+      environment         = options[:environment]
+      environment_trumps  = options[:environment_trumps]
+      rule                = options[:rule]
+      rule_mode           = options[:rule_mode]
+
+      # step 1: create the group with the parent "All Environments"
+      nc_group(group_name, parent_name: "All Environments")
+
+      # step 2: set the environment + environment trumps
+      update_group(
+        group_name,
+        environment: environment,
+        environment_trumps: environment_trumps,
+      )
+
+      # step 3: set the rules - separate step because rule_mode needs special
+      # handling
+      group = nc_group(group_name)
+      rule_change = rule_change(group, rule, rule_mode)
+      if rule_change
+        update_group(group_name, rule: group["rule"])
+      end
     end
   end
 end
